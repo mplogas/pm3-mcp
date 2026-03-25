@@ -33,14 +33,19 @@ class TestStripAnsi:
         text = "\x1b[38;5;200mcolor\x1b[0m"
         assert strip_ansi(text) == "color"
 
-    def test_removes_spinner_characters(self):
-        text = "loading \\ done"
+    def test_removes_bracketed_spinner_characters(self):
+        text = "[\\]loading...[|]still going...[/]done"
         result = strip_ansi(text)
-        assert "\\" not in result
+        assert "[\\]" not in result
+        assert "[|]" not in result
+        assert "[/]" not in result
+        assert "loading" in result
+        assert "done" in result
 
-    def test_removes_all_spinner_chars(self):
-        for ch in ["|", "/", "\\"]:
-            assert ch not in strip_ansi(ch)
+    def test_preserves_bare_pipe_in_tables(self):
+        text = "[=]   0 | AD 6F EF EC | .o.."
+        result = strip_ansi(text)
+        assert "|" in result
 
     def test_preserves_plain_text(self):
         text = "plain text with numbers 123 and punctuation: [+] ok"

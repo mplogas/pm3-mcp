@@ -23,10 +23,9 @@ def strip_ansi(text: str) -> str:
     # ANSI escape sequences: ESC followed by [ and parameter/intermediate bytes then a final byte
     ansi_re = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
     text = ansi_re.sub("", text)
-    # Remove spinner characters -- these are standalone characters used in
-    # progress indicators. Only strip when they appear as isolated spinner chars.
-    # We strip all occurrences since they are noise in parsed output.
-    text = re.sub(r"[|/\\]", "", text)
+    # Remove spinner sequences: [|] [/] [\] used in PM3 progress indicators.
+    # Only strip when they appear as bracketed spinner chars, not bare | in tables.
+    text = re.sub(r"\[[\|/\\]\]", "", text)
     return text
 
 
