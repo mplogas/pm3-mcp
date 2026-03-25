@@ -120,15 +120,18 @@ def hf_14a_info_output():
 
 @pytest.fixture
 def hf_mf_rdbl_output():
-    """Simulated output from 'pm3 -c hf mf rdbl -b 0'."""
-    return """[usb|script] pm3 --> hf mf rdbl -b 0 -k FFFFFFFFFFFF --ka
-[+] Block 0: 04 A3 B2 C1 D4 08 04 00 62 63 64 65 66 67 68 69"""
+    """Real output from 'pm3 -c hf mf rdbl --blk 0' (table format)."""
+    return """[usb|script] pm3 --> hf mf rdbl --blk 0 -k FFFFFFFFFFFF -a
+
+[=]   # | sector 00 / 0x00                                | ascii
+[=] ----+-------------------------------------------------+-----------------
+[=]   0 | AD 6F EF EC C1 08 04 00 62 63 64 65 66 67 68 69 | .o......bcdefghi"""
 
 
 @pytest.fixture
 def hf_mf_rdbl_auth_fail_output():
     """Simulated output from failed auth on block read."""
-    return """[usb|script] pm3 --> hf mf rdbl -b 4 -k FFFFFFFFFFFF --ka
+    return """[usb|script] pm3 --> hf mf rdbl --blk 4 -k FFFFFFFFFFFF -a
 [-] Auth error"""
 
 

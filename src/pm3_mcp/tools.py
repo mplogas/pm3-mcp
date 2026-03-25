@@ -192,11 +192,11 @@ async def tool_read_block(
 ) -> dict[str, Any]:
     """Read a single MIFARE block.
 
-    Runs 'hf mf rdbl -b N -k KEY --ka' (or --kb for key type B).
+    Runs 'hf mf rdbl --blk N -k KEY -a' (or -b for key type B).
     Returns parsed block data or {"error": ...}.
     """
-    key_flag = "--ka" if key_type.upper() == "A" else "--kb"
-    command = f"hf mf rdbl -b {block_num} -k {key} {key_flag}"
+    key_flag = "-a" if key_type.upper() == "A" else "-b"
+    command = f"hf mf rdbl --blk {block_num} -k {key} {key_flag}"
 
     try:
         result = manager.run_command(session_id, command)

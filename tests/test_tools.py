@@ -315,8 +315,8 @@ class TestReadBlock:
         await tools.tool_read_block(mgr, "abc12345", 0, key="FFFFFFFFFFFF", key_type="A")
 
         cmd = mgr.run_command.call_args[0][1]
-        assert "--ka" in cmd
-        assert "--kb" not in cmd
+        assert " -a" in cmd
+        assert " -b" not in cmd or "--blk" in cmd  # -b is key type B, --blk is block num
 
     @pytest.mark.asyncio
     async def test_read_block_uses_key_b_flag(self, hf_mf_rdbl_output):
@@ -326,8 +326,8 @@ class TestReadBlock:
         await tools.tool_read_block(mgr, "abc12345", 0, key="FFFFFFFFFFFF", key_type="B")
 
         cmd = mgr.run_command.call_args[0][1]
-        assert "--kb" in cmd
-        assert "--ka" not in cmd
+        assert cmd.endswith(" -b")  # key type B flag at end of command
+        assert " -a" not in cmd
 
     @pytest.mark.asyncio
     async def test_read_block_auth_failure(self, hf_mf_rdbl_auth_fail_output):

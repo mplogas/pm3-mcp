@@ -314,14 +314,28 @@ def parse_block_read(output: str) -> dict:
         stripped = line.strip()
 
         # Extract block number from command invocation line
-        # "[usb|script] pm3 --> hf mf rdbl -b 0 -k ..."
-        m = re.search(r"hf mf rdbl\s+.*?-b\s+(\d+)", stripped)
+        # "[usb|script] pm3 --> hf mf rdbl --blk 0 -k ..."
+        m = re.search(r"hf mf rdbl\s+.*?(?:--blk|-b)\s+(\d+)", stripped)
         if m:
             result["block"] = int(m.group(1))
             continue
 
-        # Success data line: "[+] Block 0: 04 A3 B2 C1 D4 08 04 00 62 63 64 65 66 67 68 69"
-        m = re.search(r"\[\+\]\s+Block\s+(\d+):\s+([0-9A-Fa-f](?:\s+[0-9A-Fa-f]{2})+|[0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)", stripped)
+        # Table format (current iceman): "[=]   0 | AD 6F EF EC ... | ascii"
+        m = re.search(r"\[=\]\s+(\d+)\s+\|\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)\s+\|", stripped)
+        if m:
+            result["success"] = True
+            result["block"] = int(m.group(1))
+            hex_str = m.group(2).strip()
+            result["hex"] = hex_str
+            byte_vals = [int(b, 16) for b in hex_str.split()]
+            result["bytes"] = len(byte_vals)
+            result["ascii"] = "".join(
+                chr(b) if 32 <= b < 127 else "." for b in byte_vals
+            )
+            continue
+
+        # Legacy format: "[+] Block 0: 04 A3 B2 C1 ..."
+        m = re.search(r"\[\+\]\s+Block\s+(\d+):\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)", stripped)
         if m:
             result["success"] = True
             result["block"] = int(m.group(1))

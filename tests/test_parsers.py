@@ -227,7 +227,7 @@ class TestParseBlockRead:
     def test_hex_data(self, hf_mf_rdbl_output):
         result = parse_block_read(hf_mf_rdbl_output)
         # space-separated hex bytes
-        assert result["hex"] == "04 A3 B2 C1 D4 08 04 00 62 63 64 65 66 67 68 69"
+        assert result["hex"] == "AD 6F EF EC C1 08 04 00 62 63 64 65 66 67 68 69"
 
     def test_bytes_count(self, hf_mf_rdbl_output):
         result = parse_block_read(hf_mf_rdbl_output)
