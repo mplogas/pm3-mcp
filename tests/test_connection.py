@@ -19,8 +19,8 @@ from pm3_mcp.connection import ConnectionManager, _detect_port, _find_pm3, _sani
 
 def _make_completed_process(stdout="", stderr="", returncode=0):
     proc = MagicMock(spec=subprocess.CompletedProcess)
-    proc.stdout = stdout
-    proc.stderr = stderr
+    proc.stdout = stdout.encode("utf-8") if isinstance(stdout, str) else stdout
+    proc.stderr = stderr.encode("utf-8") if isinstance(stderr, str) else stderr
     proc.returncode = returncode
     return proc
 

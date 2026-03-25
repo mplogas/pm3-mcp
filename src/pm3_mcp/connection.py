@@ -67,10 +67,12 @@ def _run_raw(port: str, command: str, timeout: int = 30) -> dict[str, Any]:
         proc = subprocess.run(
             cmd,
             capture_output=True,
-            text=True,
             timeout=timeout,
         )
-        output = strip_ansi(proc.stdout + proc.stderr)
+        # PM3 output can contain non-UTF8 bytes in the ascii column of hex dumps.
+        # Decode with replace to avoid crashing on those.
+        raw = proc.stdout.decode("utf-8", errors="replace") + proc.stderr.decode("utf-8", errors="replace")
+        output = strip_ansi(raw)
         return {
             "success": proc.returncode == 0,
             "output": output,
