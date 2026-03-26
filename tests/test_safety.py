@@ -7,7 +7,8 @@ from pm3_mcp.safety import SafetyTier, classify_tool
 class TestClassifyTool:
     def test_read_only_tools(self):
         for tool in ["hw_status", "detect_tag", "hf_info", "lf_info",
-                     "read_block", "dump_tag"]:
+                     "read_block", "dump_tag",
+                     "autopwn", "darkside", "nested", "hardnested", "chk_keys"]:
             assert classify_tool(tool) == SafetyTier.READ_ONLY
 
     def test_allowed_write_tools(self):

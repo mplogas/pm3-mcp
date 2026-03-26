@@ -24,6 +24,11 @@ _TOOL_TIERS: dict[str, SafetyTier] = {
     "lf_info": SafetyTier.READ_ONLY,
     "read_block": SafetyTier.READ_ONLY,
     "dump_tag": SafetyTier.READ_ONLY,
+    "autopwn": SafetyTier.READ_ONLY,
+    "darkside": SafetyTier.READ_ONLY,
+    "nested": SafetyTier.READ_ONLY,
+    "hardnested": SafetyTier.READ_ONLY,
+    "chk_keys": SafetyTier.READ_ONLY,
     "connect": SafetyTier.ALLOWED_WRITE,
     "disconnect": SafetyTier.ALLOWED_WRITE,
 }
