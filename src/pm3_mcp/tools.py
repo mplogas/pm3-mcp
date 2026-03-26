@@ -787,3 +787,130 @@ async def tool_iso15693_wrbl(
         "block": block_num,
         "error": None if success else output.strip(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Sniff tools (read-only tier)
+# ---------------------------------------------------------------------------
+
+_VALID_SNIFF_PROTOCOLS = {"14a", "iclass", "15693"}
+
+_SNIFF_COMMANDS = {
+    "14a": "hf 14a sniff",
+    "iclass": "hf iclass sniff",
+    "15693": "hf 15 sniff",
+}
+
+_TRACE_LIST_FLAGS = {
+    "14a": "14a",
+    "iclass": "iclass",
+    "15693": "15",
+}
+
+
+async def tool_sniff_start(
+    manager: ConnectionManager,
+    session_id: str,
+    protocol: str,
+) -> dict[str, Any]:
+    """Start sniffing RF traffic for the given protocol.
+
+    protocol must be one of: 14a, iclass, 15693.
+    Blocks until the PM3 button is pressed to stop the sniff.
+    Returns {success, protocol, output} or {"error": ...}.
+    """
+    if protocol not in _VALID_SNIFF_PROTOCOLS:
+        return {
+            "error": (
+                f"unsupported protocol: {protocol!r}. "
+                f"Must be one of: {', '.join(sorted(_VALID_SNIFF_PROTOCOLS))}"
+            )
+        }
+
+    command = _SNIFF_COMMANDS[protocol]
+
+    try:
+        result = manager.run_sniff(session_id, command)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+
+    return {
+        "success": result.get("success", False),
+        "protocol": protocol,
+        "output": result.get("output", ""),
+    }
+
+
+async def tool_sniff_stop(
+    manager: ConnectionManager,
+    session_id: str,
+    protocol: str,
+) -> dict[str, Any]:
+    """Decode and save the trace buffer after a sniff.
+
+    protocol must be one of: 14a, iclass, 15693.
+    Checks hw status for trace data, saves to artifacts, decodes with trace list.
+    Returns {captured, trace_bytes, trace_file, exchanges, exchange_count, auth_nonces}
+    or {captured: False, message: ...} if no data was captured.
+    """
+    if protocol not in _VALID_SNIFF_PROTOCOLS:
+        return {
+            "error": (
+                f"unsupported protocol: {protocol!r}. "
+                f"Must be one of: {', '.join(sorted(_VALID_SNIFF_PROTOCOLS))}"
+            )
+        }
+
+    # Step 1: check trace length via hw status
+    try:
+        status_result = manager.run_command(session_id, "hw status")
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("sniff_stop hw status failed: %s", exc)
+        return {"error": str(exc)}
+
+    trace_status = parsers.parse_hw_trace_status(status_result.get("output", ""))
+    if trace_status["trace_len"] == 0:
+        return {
+            "captured": False,
+            "message": "No data captured. Ensure a tag was present during the sniff.",
+        }
+
+    # Step 2: save the trace to artifacts
+    artifacts_path = manager.get_artifacts_path(session_id)
+    if artifacts_path is None:
+        return {"error": f"session not found: {session_id}"}
+
+    trace_file = str(artifacts_path / f"trace-{protocol}")
+
+    try:
+        manager.run_command(session_id, f"trace save -f {trace_file}")
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("sniff_stop trace save failed: %s", exc)
+        return {"error": str(exc)}
+
+    # Step 3: load and decode the trace
+    proto_flag = _TRACE_LIST_FLAGS[protocol]
+    try:
+        list_result = manager.run_command(
+            session_id, f"trace load -f {trace_file}; trace list -t {proto_flag}"
+        )
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("sniff_stop trace list failed: %s", exc)
+        return {"error": str(exc)}
+
+    parsed = parsers.parse_trace_list(list_result.get("output", ""))
+
+    return {
+        "captured": True,
+        "trace_bytes": parsed["trace_bytes"],
+        "trace_file": trace_file,
+        "exchanges": parsed["exchanges"],
+        "exchange_count": parsed["exchange_count"],
+        "auth_nonces": parsed["auth_nonces"],
+    }

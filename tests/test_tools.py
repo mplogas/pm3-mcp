@@ -641,3 +641,114 @@ class TestChkKeys:
         result = await tools.tool_chk_keys(mgr, "abc12345")
 
         assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# TestSniffStart
+# ---------------------------------------------------------------------------
+
+class TestSniffStart:
+    @pytest.mark.asyncio
+    async def test_sniff_start_iso15693(self):
+        mgr = _make_manager()
+        mgr.run_sniff = MagicMock(return_value=_run_ok("sniffing..."))
+
+        result = await tools.tool_sniff_start(mgr, "abc12345", "15693")
+
+        assert result["success"] is True
+        assert result["protocol"] == "15693"
+        cmd = mgr.run_sniff.call_args[0][1]
+        assert "hf 15 sniff" in cmd
+
+    @pytest.mark.asyncio
+    async def test_sniff_start_14a(self):
+        mgr = _make_manager()
+        mgr.run_sniff = MagicMock(return_value=_run_ok("sniffing..."))
+
+        result = await tools.tool_sniff_start(mgr, "abc12345", "14a")
+
+        assert result["success"] is True
+        cmd = mgr.run_sniff.call_args[0][1]
+        assert "hf 14a sniff" in cmd
+
+    @pytest.mark.asyncio
+    async def test_sniff_start_iclass(self):
+        mgr = _make_manager()
+        mgr.run_sniff = MagicMock(return_value=_run_ok("sniffing..."))
+
+        result = await tools.tool_sniff_start(mgr, "abc12345", "iclass")
+
+        assert result["success"] is True
+        cmd = mgr.run_sniff.call_args[0][1]
+        assert "hf iclass sniff" in cmd
+
+    @pytest.mark.asyncio
+    async def test_sniff_start_invalid_protocol(self):
+        mgr = _make_manager()
+        mgr.run_sniff = MagicMock()
+
+        result = await tools.tool_sniff_start(mgr, "abc12345", "lf134")
+
+        assert "error" in result
+        assert "unsupported" in result["error"].lower()
+        mgr.run_sniff.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sniff_start_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.run_sniff = MagicMock(side_effect=KeyError("abc12345"))
+
+        result = await tools.tool_sniff_start(mgr, "abc12345", "14a")
+
+        assert "error" in result
+        assert "abc12345" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# TestSniffStop
+# ---------------------------------------------------------------------------
+
+class TestSniffStop:
+    @pytest.mark.asyncio
+    async def test_sniff_stop_with_data(
+        self, hw_status_with_trace_output, trace_list_iso15693_output
+    ):
+        mgr = _make_manager()
+        mgr.get_artifacts_path.return_value = Path("/tmp/artifacts")
+        mgr.run_command.side_effect = [
+            _run_ok(hw_status_with_trace_output),   # hw status
+            _run_ok(""),                             # trace save
+            _run_ok(trace_list_iso15693_output),    # trace load + list
+        ]
+
+        result = await tools.tool_sniff_stop(mgr, "abc12345", "15693")
+
+        assert result["captured"] is True
+        assert result["trace_bytes"] == 741
+        assert result["trace_file"] == "/tmp/artifacts/trace-15693"
+        assert len(result["exchanges"]) > 0
+        assert isinstance(result["exchange_count"], int)
+        assert result["exchange_count"] == len(result["exchanges"])
+        assert isinstance(result["auth_nonces"], list)
+
+    @pytest.mark.asyncio
+    async def test_sniff_stop_empty_trace(self, hw_status_no_trace_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(hw_status_no_trace_output)
+
+        result = await tools.tool_sniff_stop(mgr, "abc12345", "15693")
+
+        assert result["captured"] is False
+        assert "message" in result
+        # Should not proceed past the hw status check
+        assert mgr.run_command.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_sniff_stop_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.run_command.side_effect = KeyError("abc12345")
+
+        result = await tools.tool_sniff_stop(mgr, "abc12345", "14a")
+
+        assert "error" in result
+        assert "abc12345" in result["error"]
