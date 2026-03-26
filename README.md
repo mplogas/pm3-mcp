@@ -58,6 +58,11 @@ Set `PIDEV_ENGAGEMENTS_DIR` to control where engagement logs are written. Defaul
 | `lf_info` | read-only | LF tag protocol identification |
 | `read_block` | read-only | Read a single MIFARE Classic block |
 | `dump_tag` | read-only | Full memory dump (MIFARE Classic 1K/4K, Ultralight) |
+| `autopwn` | read-only | Auto-recover all MIFARE Classic keys (dictionary + darkside + nested + hardnested) |
+| `darkside` | read-only | Recover one key via PRNG weakness |
+| `nested` | read-only | Recover key using known key (weak PRNG) |
+| `hardnested` | read-only | Recover key using known key (hard PRNG) |
+| `chk_keys` | read-only | Dictionary check against all sectors |
 | `connect` | allowed-write | Validate PM3, create engagement folder |
 | `disconnect` | allowed-write | Finalize command log |
 
