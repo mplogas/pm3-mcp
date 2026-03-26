@@ -36,6 +36,10 @@ _TOOL_TIERS: dict[str, SafetyTier] = {
     "iclass_rdbl": SafetyTier.READ_ONLY,
     "iso15693_info": SafetyTier.READ_ONLY,
     "iso15693_rdbl": SafetyTier.READ_ONLY,
+    "iclass_dump": SafetyTier.READ_ONLY,
+    "iso15693_dump": SafetyTier.READ_ONLY,
+    "iclass_chk": SafetyTier.READ_ONLY,
+    "iclass_loclass": SafetyTier.READ_ONLY,
     "connect": SafetyTier.ALLOWED_WRITE,
     "disconnect": SafetyTier.ALLOWED_WRITE,
 }

@@ -10,7 +10,8 @@ class TestClassifyTool:
                      "read_block", "dump_tag",
                      "autopwn", "darkside", "nested", "hardnested", "chk_keys",
                      "desfire_info", "desfire_apps", "desfire_files",
-                     "iclass_info", "iclass_rdbl", "iso15693_info", "iso15693_rdbl"]:
+                     "iclass_info", "iclass_rdbl", "iso15693_info", "iso15693_rdbl",
+                     "iclass_dump", "iso15693_dump", "iclass_chk", "iclass_loclass"]:
             assert classify_tool(tool) == SafetyTier.READ_ONLY
 
     def test_allowed_write_tools(self):

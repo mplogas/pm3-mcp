@@ -425,6 +425,58 @@ TOOL_DEFINITIONS = [
             "required": ["session_id", "block_num"],
         },
     ),
+    Tool(
+        name="iclass_dump",
+        description="Dump iCLASS / PicoPass tag memory to file. [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "key": {"type": "string", "description": "8-byte debit key hex (omit for unauthenticated)"},
+                "credit_key": {"type": "string", "description": "8-byte credit key hex"},
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="iso15693_dump",
+        description="Dump ISO 15693 tag memory to file. [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="iclass_chk",
+        description="Check iCLASS keys from built-in dictionary. [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "credit": {"type": "boolean", "default": False, "description": "Check as credit key"},
+                "elite": {"type": "boolean", "default": False, "description": "Apply elite key diversification"},
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="iclass_loclass",
+        description=(
+            "Recover iCLASS key via loclass attack. Requires a trace file "
+            "from 'hf iclass sim -t 2'. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "trace_file": {"type": "string", "description": "Path to NR/MAC trace file (omit for default)"},
+            },
+            "required": ["session_id"],
+        },
+    ),
 ]
 
 
@@ -593,6 +645,35 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 manager=connection_manager,
                 session_id=arguments["session_id"],
                 block_num=arguments["block_num"],
+            )
+
+        elif name == "iclass_dump":
+            result = await tools.tool_iclass_dump(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                key=arguments.get("key"),
+                credit_key=arguments.get("credit_key"),
+            )
+
+        elif name == "iso15693_dump":
+            result = await tools.tool_iso15693_dump(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "iclass_chk":
+            result = await tools.tool_iclass_chk(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                credit=arguments.get("credit", False),
+                elite=arguments.get("elite", False),
+            )
+
+        elif name == "iclass_loclass":
+            result = await tools.tool_iclass_loclass(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                trace_file=arguments.get("trace_file"),
             )
 
         else:

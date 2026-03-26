@@ -1186,3 +1186,73 @@ def parse_iso15693_rdbl(output: str) -> dict:
         "bytes": None,
         "error": "Block read failed.",
     }
+
+
+def parse_iclass_chk(output: str) -> dict:
+    """Parse output from 'hf iclass chk'.
+
+    Returns:
+        found: bool
+        key: hex string if found
+        error: str or None
+    """
+    # Success: [+] Found valid key AAXXXXXXXXXX
+    key_match = re.search(r"[Ff]ound valid key\s+([0-9A-Fa-f]+)", output)
+    if key_match:
+        return {
+            "found": True,
+            "key": key_match.group(1).upper(),
+            "error": None,
+        }
+
+    # Also try: "key : XXXX"
+    key_match2 = re.search(r"key\s*:\s*([0-9A-Fa-f]{16})", output)
+    if key_match2:
+        return {
+            "found": True,
+            "key": key_match2.group(1).upper(),
+            "error": None,
+        }
+
+    return {
+        "found": False,
+        "key": None,
+        "error": "No matching key found in dictionary.",
+    }
+
+
+def parse_iclass_loclass(output: str) -> dict:
+    """Parse output from 'hf iclass loclass'.
+
+    Returns:
+        success: bool
+        key: hex string if recovered
+        error: str or None
+    """
+    # Success: key recovered
+    key_match = re.search(r"[Kk]ey\s*:\s*([0-9A-Fa-f]{16})", output)
+    if key_match:
+        return {
+            "success": True,
+            "key": key_match.group(1).upper(),
+            "error": None,
+        }
+
+    # Also: "Found key:"
+    key_match2 = re.search(r"[Ff]ound key[:\s]+([0-9A-Fa-f]+)", output)
+    if key_match2:
+        return {
+            "success": True,
+            "key": key_match2.group(1).upper(),
+            "error": None,
+        }
+
+    error = "loclass attack failed."
+    if "no file" in output.lower() or "not found" in output.lower():
+        error = "Trace file not found. Run 'hf iclass sim -t 2' first to capture NR/MAC pairs."
+
+    return {
+        "success": False,
+        "key": None,
+        "error": error,
+    }

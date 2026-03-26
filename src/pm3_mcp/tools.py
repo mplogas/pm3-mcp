@@ -539,3 +539,120 @@ async def tool_iso15693_rdbl(
         return {"error": str(exc)}
 
     return parsers.parse_iso15693_rdbl(result.get("output", ""))
+
+
+# ---------------------------------------------------------------------------
+# Dumps (iCLASS, ISO 15693)
+# ---------------------------------------------------------------------------
+
+async def tool_iclass_dump(
+    manager: ConnectionManager,
+    session_id: str,
+    key: str | None = None,
+    credit_key: str | None = None,
+) -> dict[str, Any]:
+    """Dump iCLASS tag memory to file.
+
+    key: 8-byte debit key hex. If None, tries without auth.
+    credit_key: 8-byte credit key hex for credit-protected areas.
+    """
+    artifacts_path = manager.get_artifacts_path(session_id)
+    if artifacts_path is None:
+        return {"error": f"session not found: {session_id}"}
+
+    dump_path = str(artifacts_path / "iclass-dump")
+    command = f"hf iclass dump -f {dump_path}"
+    if key:
+        command += f" -k {key}"
+    if credit_key:
+        command += f" --credit {credit_key}"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=60)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iclass_dump failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_dump_result(result.get("output", ""), dump_path)
+
+
+async def tool_iso15693_dump(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Dump ISO 15693 tag memory to file."""
+    artifacts_path = manager.get_artifacts_path(session_id)
+    if artifacts_path is None:
+        return {"error": f"session not found: {session_id}"}
+
+    dump_path = str(artifacts_path / "iso15693-dump")
+    command = f"hf 15 dump -f {dump_path} -*"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=30)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iso15693_dump failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_dump_result(result.get("output", ""), dump_path)
+
+
+# ---------------------------------------------------------------------------
+# iCLASS key recovery
+# ---------------------------------------------------------------------------
+
+async def tool_iclass_chk(
+    manager: ConnectionManager,
+    session_id: str,
+    credit: bool = False,
+    elite: bool = False,
+) -> dict[str, Any]:
+    """Run 'hf iclass chk' to check keys from the built-in dictionary.
+
+    credit: check as credit key instead of debit.
+    elite: apply elite key diversification.
+    """
+    command = "hf iclass chk"
+    if credit:
+        command += " --credit"
+    if elite:
+        command += " --elite"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=120)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iclass_chk failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_iclass_chk(result.get("output", ""))
+
+
+async def tool_iclass_loclass(
+    manager: ConnectionManager,
+    session_id: str,
+    trace_file: str | None = None,
+) -> dict[str, Any]:
+    """Run 'hf iclass loclass' to recover iCLASS keys via loclass attack.
+
+    Requires a trace file from 'hf iclass sim -t 2' (sniffed NR/MAC pairs).
+    If trace_file is None, uses the default location.
+    """
+    command = "hf iclass loclass"
+    if trace_file:
+        command += f" -f {trace_file}"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=300)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iclass_loclass failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_iclass_loclass(result.get("output", ""))
