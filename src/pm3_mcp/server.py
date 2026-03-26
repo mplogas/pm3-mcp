@@ -194,6 +194,134 @@ TOOL_DEFINITIONS = [
             "required": ["session_id", "tag_type"],
         },
     ),
+    Tool(
+        name="autopwn",
+        description=(
+            "Run 'hf mf autopwn' to automatically recover all MIFARE Classic keys. "
+            "Chains dictionary, darkside, nested, and hardnested attacks as needed. "
+            "Returns recovered keys and dump path. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="darkside",
+        description=(
+            "Run 'hf mf darkside' to recover a MIFARE Classic key using the "
+            "darkside attack. Only works on cards with a weak PRNG. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="nested",
+        description=(
+            "Run 'hf mf nested' to recover unknown MIFARE Classic keys using a "
+            "known key. Requires a working key for at least one sector. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+                "known_key": {
+                    "type": "string",
+                    "description": "Known authentication key (12 hex chars, no spaces)",
+                },
+                "known_key_type": {
+                    "type": "string",
+                    "default": "A",
+                    "description": "Key type for the known key: A or B",
+                },
+                "target_sector": {
+                    "type": "integer",
+                    "description": "Sector number to attack",
+                },
+                "target_key_type": {
+                    "type": "string",
+                    "default": "A",
+                    "description": "Key type to recover on the target sector: A or B",
+                },
+            },
+            "required": ["session_id", "known_key", "target_sector"],
+        },
+    ),
+    Tool(
+        name="hardnested",
+        description=(
+            "Run 'hf mf hardnested' to recover unknown MIFARE Classic keys using a "
+            "known key. Works on cards with a hard PRNG where nested fails. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+                "known_key": {
+                    "type": "string",
+                    "description": "Known authentication key (12 hex chars, no spaces)",
+                },
+                "known_key_type": {
+                    "type": "string",
+                    "default": "A",
+                    "description": "Key type for the known key: A or B",
+                },
+                "target_sector": {
+                    "type": "integer",
+                    "description": "Sector number to attack",
+                },
+                "target_key_type": {
+                    "type": "string",
+                    "default": "A",
+                    "description": "Key type to recover on the target sector: A or B",
+                },
+            },
+            "required": ["session_id", "known_key", "target_sector"],
+        },
+    ),
+    Tool(
+        name="chk_keys",
+        description=(
+            "Run 'hf mf chk' to test a list of keys against all sectors. "
+            "Returns which keys authenticate to which sectors. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+                "key_list": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of keys to test (12 hex chars each). "
+                    "Omit to use the built-in PM3 default dictionary.",
+                },
+            },
+            "required": ["session_id"],
+        },
+    ),
 ]
 
 
@@ -276,6 +404,45 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 session_id=arguments["session_id"],
                 tag_type=arguments["tag_type"],
                 key_file=arguments.get("key_file"),
+            )
+
+        elif name == "autopwn":
+            result = await tools.tool_autopwn(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "darkside":
+            result = await tools.tool_darkside(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "nested":
+            result = await tools.tool_nested(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                known_key=arguments["known_key"],
+                known_key_type=arguments.get("known_key_type", "A"),
+                target_sector=arguments["target_sector"],
+                target_key_type=arguments.get("target_key_type", "A"),
+            )
+
+        elif name == "hardnested":
+            result = await tools.tool_hardnested(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                known_key=arguments["known_key"],
+                known_key_type=arguments.get("known_key_type", "A"),
+                target_sector=arguments["target_sector"],
+                target_key_type=arguments.get("target_key_type", "A"),
+            )
+
+        elif name == "chk_keys":
+            result = await tools.tool_chk_keys(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                key_list=arguments.get("key_list"),
             )
 
         else:
