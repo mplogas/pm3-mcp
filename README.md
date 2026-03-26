@@ -87,7 +87,7 @@ Three tiers enforced at the MCP server boundary:
 
 - **read-only:** full autonomy. Reading a tag does not alter it.
 - **allowed-write:** autonomous, all calls logged. Creates engagement folders.
-- **approval-write:** reserved for future write/clone operations (no MVP tools). Writing overwrites tag data irreversibly.
+- **approval-write:** blocks until human confirms via `_confirmed` parameter. Writing overwrites tag data irreversibly.
 
 ## Architecture
 
