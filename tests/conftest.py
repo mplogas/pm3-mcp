@@ -405,3 +405,99 @@ def autopwn_partial_no_table_output():
 [#] AcquireEncryptedNonces: Auth1 error
 [#] AcquireEncryptedNonces: Auth1 error
 [-] No match for the First_Byte_Sum (130), is the card a genuine MFC Ev1?"""
+
+
+@pytest.fixture
+def desfire_info_output():
+    """Real output from 'hf mfdes info' on a DESFire EV2 8K card."""
+    return """[usb|script] pm3 --> hf mfdes info
+
+[=] ---------------------------------- Tag Information ----------------------------------
+[+]               UID: 04 40 6C 62 24 12 90
+[+]      Batch number: CF 6D D6 61 31
+[+]   Production date: week 18 / 2022
+[+]      Product type: MIFARE DESFire native IC (physical card)
+
+[=] --- Hardware Information
+[=]    raw: 04010112001A05
+[=]      Vendor Id: NXP Semiconductors Germany
+[=]           Type: 0x01 ( DESFire )
+[=]        Subtype: 0x01
+[=]        Version: 12.0 ( DESFire EV2 )
+[=]   Storage size: 0x1A ( 8192 bytes )
+[=]       Protocol: 0x05 ( ISO 14443-2, 14443-3 )
+
+[=] --- Software Information
+[=]    raw: 04010102011A05
+[=]      Vendor Id: NXP Semiconductors Germany
+[=]           Type: 0x01 ( DESFire )
+[=]        Subtype: 0x01
+[=]        Version: 2.1
+[=]   Storage size: 0x1A ( 8192 bytes )
+[=]       Protocol: 0x05 ( ISO 14443-3, 14443-4 )
+
+[=] --------------------------------- Card capabilities ---------------------------------
+
+[=] --- Tag Signature
+[=]  IC signature public key name: NTAG424DNA, NTAG424DNATT, DESFire EV2, DESFire Light EV2
+[+]        Signature verification: successful
+
+[+] --- AID list ( 2 found )
+[+] 000357,
+[+] 0000F0,
+
+[+] ------------------------------------ PICC level -------------------------------------
+[+] # applications....... 2
+[+] PICC level auth commands
+[+]    Auth AES.......... YES
+[+]    Auth Ev2.......... YES
+[+] Key type... AES
+[+] Key cnt.... 1
+[+] PICC key 0 version: 0 (0x00)
+
+[=] --- Free memory
+[+]    Available free memory on card... 3328 bytes
+
+[=] Standalone DESFire"""
+
+
+@pytest.fixture
+def desfire_info_no_tag_output():
+    """Output from 'hf mfdes info' with no tag present."""
+    return """[usb|script] pm3 --> hf mfdes info
+[#] Can't select card
+[!] Can't select card"""
+
+
+@pytest.fixture
+def desfire_lsapp_output():
+    """Real output from 'hf mfdes lsapp --no-auth' on a DESFire EV2."""
+    return """[usb|script] pm3 --> hf mfdes lsapp --no-auth
+[=] It may take up to 15 seconds. Processing...
+
+[+] ------------------------------------ PICC level -------------------------------------
+[+] # applications....... 2
+
+[+] --------------------------------- Applications list ---------------------------------
+[+] Application ID....... 0x357
+[+]    ISO id............ 0x0000
+[=]   DF AID Function... 000357  : LEGIC [LEGIC]
+[+] Auth commands
+[+]    Auth.............. YES
+[+]    Auth ISO.......... YES
+[+]    Auth AES.......... NO
+
+[+] Application ID....... 0xF0
+[+]    ISO id............ 0x0000
+[=]   DF AID Function... 0000F0  : OMNY (One Metro New York) (JFK) / BMW Digital Key [Metropolitan Transportation Authority (MTA) / Bayerische Motoren Werke (BMW) AG]
+[+] Auth commands
+[+]    Auth.............. NO
+[+]    Auth AES.......... YES
+[+]    Auth Ev2.......... YES"""
+
+
+@pytest.fixture
+def desfire_lsfiles_auth_required_output():
+    """Output from 'hf mfdes lsfiles' when auth is required."""
+    return """[usb|script] pm3 --> hf mfdes lsfiles --no-auth --aid 000357
+[!!] Desfire GetFileIDList command error. Result: -20"""

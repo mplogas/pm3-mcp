@@ -18,6 +18,9 @@ from pm3_mcp.parsers import (
     parse_hardnested,
     parse_chk_keys,
     sector_to_trailer,
+    parse_desfire_info,
+    parse_desfire_apps,
+    parse_desfire_files,
 )
 
 
@@ -448,3 +451,81 @@ class TestParseAutopwnPartialNoTable:
         assert result["complete"] is True
         assert len(result["keys"]) == 16
         assert result["error"] is None
+
+
+# ---------------------------------------------------------------------------
+# DESFire parsers
+# ---------------------------------------------------------------------------
+
+class TestParseDesfireInfo:
+    def test_found(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["found"] is True
+
+    def test_uid(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["uid"] == "04406C62241290"
+
+    def test_production(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert "2022" in result["production"]
+
+    def test_hw_version(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert "EV2" in result["hw_version"]
+
+    def test_storage(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["storage_bytes"] == 8192
+
+    def test_free_memory(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["free_bytes"] == 3328
+
+    def test_signature(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["signature_ok"] is True
+
+    def test_app_count(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["app_count"] == 2
+
+    def test_key_type(self, desfire_info_output):
+        result = parse_desfire_info(desfire_info_output)
+        assert result["key_type"] == "AES"
+
+    def test_no_tag(self, desfire_info_no_tag_output):
+        result = parse_desfire_info(desfire_info_no_tag_output)
+        assert result["found"] is False
+        assert "error" in result
+        assert result["error"] is not None
+
+
+class TestParseDesfireApps:
+    def test_app_count(self, desfire_lsapp_output):
+        result = parse_desfire_apps(desfire_lsapp_output)
+        assert result["app_count"] == 2
+
+    def test_app_ids(self, desfire_lsapp_output):
+        result = parse_desfire_apps(desfire_lsapp_output)
+        aids = [a["aid"] for a in result["apps"]]
+        assert "357" in aids or "0357" in aids
+
+    def test_app_description(self, desfire_lsapp_output):
+        result = parse_desfire_apps(desfire_lsapp_output)
+        descs = [a.get("description", "") or "" for a in result["apps"]]
+        assert any("LEGIC" in d for d in descs)
+
+    def test_app_auth_methods(self, desfire_lsapp_output):
+        result = parse_desfire_apps(desfire_lsapp_output)
+        assert len(result["apps"]) >= 1
+        first_app = result["apps"][0]
+        assert "auth_methods" in first_app
+        assert isinstance(first_app["auth_methods"], dict)
+
+
+class TestParseDesfireFiles:
+    def test_auth_required(self, desfire_lsfiles_auth_required_output):
+        result = parse_desfire_files(desfire_lsfiles_auth_required_output)
+        assert result["success"] is False
+        assert "auth" in result["error"].lower()

@@ -653,3 +653,156 @@ def parse_chk_keys(output: str) -> dict:
         "found_count": found_count,
         "total_sectors": len(keys),
     }
+
+
+def parse_desfire_info(output: str) -> dict:
+    """Parse output from 'hf mfdes info'.
+
+    Returns:
+        found: bool
+        uid: str or None
+        batch: str or None
+        production: str or None
+        product_type: str or None
+        hw_version: str or None (e.g. "DESFire EV2")
+        storage_bytes: int
+        free_bytes: int
+        signature_ok: bool
+        app_count: int
+        app_ids: list of str
+        picc_auth: dict of auth method -> bool
+        key_type: str or None (e.g. "AES")
+        error: str or None
+    """
+    if "Can't select card" in output:
+        return {
+            "found": False,
+            "error": "No DESFire tag detected. Check card positioning.",
+        }
+
+    uid = _extract(r"UID:\s*([0-9A-Fa-f ]+)", output)
+    batch = _extract(r"Batch number:\s*([0-9A-Fa-f ]+)", output)
+    production = _extract(r"Production date:\s*(.+)", output)
+    product_type = _extract(r"Product type:\s*(.+)", output)
+
+    # Hardware version: "Version: 12.0 ( DESFire EV2 )"
+    hw_version = _extract(r"Version:\s*[\d.]+ \(\s*(.+?)\s*\)", output)
+
+    # Storage: "Storage size: 0x1A ( 8192 bytes )"
+    storage_match = re.search(r"Storage size:.*?\(\s*(\d+)\s*bytes\s*\)", output)
+    storage_bytes = int(storage_match.group(1)) if storage_match else 0
+
+    # Free memory: "Available free memory on card... 3328 bytes"
+    free_match = re.search(r"free memory.*?(\d+)\s*bytes", output)
+    free_bytes = int(free_match.group(1)) if free_match else 0
+
+    # Signature verification
+    signature_ok = "Signature verification: successful" in output
+
+    # App count and IDs
+    app_count_match = re.search(r"#\s*applications[.]*\s*(\d+)", output)
+    app_count = int(app_count_match.group(1)) if app_count_match else 0
+
+    app_ids = re.findall(r"AID list.*?found.*?\n((?:\[\+\]\s+[0-9A-Fa-f]+.*\n?)+)", output)
+    aids = []
+    if app_ids:
+        aids = re.findall(r"([0-9A-Fa-f]{4,6})", app_ids[0])
+
+    # PICC-level auth methods
+    picc_auth = {}
+    for m in re.finditer(r"Auth\s*([\w .]+?)\s*\.+\s*(YES|NO)", output):
+        picc_auth[m.group(1).strip()] = m.group(2) == "YES"
+
+    # Key type
+    key_type = _extract(r"Key type[.]*\s*(\w+)", output)
+
+    return {
+        "found": True,
+        "uid": uid.replace(" ", "") if uid else None,
+        "batch": batch.strip() if batch else None,
+        "production": production.strip() if production else None,
+        "product_type": product_type.strip() if product_type else None,
+        "hw_version": hw_version,
+        "storage_bytes": storage_bytes,
+        "free_bytes": free_bytes,
+        "signature_ok": signature_ok,
+        "app_count": app_count,
+        "app_ids": aids,
+        "picc_auth": picc_auth,
+        "key_type": key_type,
+        "error": None,
+    }
+
+
+def _extract(pattern: str, text: str) -> str | None:
+    """Extract first group from a regex match, or None."""
+    m = re.search(pattern, text)
+    return m.group(1) if m else None
+
+
+def parse_desfire_apps(output: str) -> dict:
+    """Parse output from 'hf mfdes lsapp --no-auth'.
+
+    Returns:
+        app_count: int
+        apps: list of {aid, iso_id, description, auth_methods}
+    """
+    apps = []
+
+    # Split on "Application ID" lines
+    app_blocks = re.split(r"(?=\[\+\] Application ID)", output)
+    for block in app_blocks:
+        aid_match = re.search(r"Application ID[.]*\s*0x([0-9A-Fa-f]+)", block)
+        if not aid_match:
+            continue
+
+        aid = aid_match.group(1).upper()
+        iso_id = _extract(r"ISO id[.]*\s*0x([0-9A-Fa-f]+)", block)
+        desc = _extract(r"DF AID Function[.]*\s*\S+\s*:\s*(.+)", block)
+
+        auth_methods = {}
+        for m in re.finditer(r"Auth\s*([\w .]+?)\s*\.+\s*(YES|NO)", block):
+            auth_methods[m.group(1).strip()] = m.group(2) == "YES"
+
+        apps.append({
+            "aid": aid,
+            "iso_id": iso_id,
+            "description": desc.strip() if desc else None,
+            "auth_methods": auth_methods,
+        })
+
+    app_count_match = re.search(r"#\s*applications[.]*\s*(\d+)", output)
+    app_count = int(app_count_match.group(1)) if app_count_match else len(apps)
+
+    return {
+        "app_count": app_count,
+        "apps": apps,
+    }
+
+
+def parse_desfire_files(output: str) -> dict:
+    """Parse output from 'hf mfdes lsfiles --no-auth --aid <AID>'.
+
+    Returns:
+        success: bool
+        files: list of file info dicts (if accessible)
+        error: str or None
+    """
+    if "GetFileIDList command error" in output or "error" in output.lower():
+        return {
+            "success": False,
+            "files": [],
+            "error": "Authentication required to list files in this application.",
+        }
+
+    # If we get here, files were listed (rare without auth)
+    files = []
+    # Parse file entries if present (format varies)
+    for m in re.finditer(r"File ID[.]*\s*(\d+)", output):
+        files.append({"file_id": int(m.group(1))})
+
+    return {
+        "success": True,
+        "files": files,
+        "error": None,
+    }

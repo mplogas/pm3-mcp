@@ -29,6 +29,9 @@ _TOOL_TIERS: dict[str, SafetyTier] = {
     "nested": SafetyTier.READ_ONLY,
     "hardnested": SafetyTier.READ_ONLY,
     "chk_keys": SafetyTier.READ_ONLY,
+    "desfire_info": SafetyTier.READ_ONLY,
+    "desfire_apps": SafetyTier.READ_ONLY,
+    "desfire_files": SafetyTier.READ_ONLY,
     "connect": SafetyTier.ALLOWED_WRITE,
     "disconnect": SafetyTier.ALLOWED_WRITE,
 }

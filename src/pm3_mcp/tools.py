@@ -392,3 +392,64 @@ async def tool_chk_keys(
         return {"error": str(exc)}
 
     return parsers.parse_chk_keys(result.get("output", ""))
+
+
+async def tool_desfire_info(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Run 'hf mfdes info' to get DESFire tag details.
+
+    Returns UID, version, storage, applications, auth methods.
+    """
+    try:
+        result = manager.run_command(session_id, "hf mfdes info", timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("desfire_info failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_desfire_info(result.get("output", ""))
+
+
+async def tool_desfire_apps(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Run 'hf mfdes lsapp --no-auth' to enumerate DESFire applications.
+
+    Returns application IDs, descriptions, and auth requirements.
+    """
+    try:
+        result = manager.run_command(session_id, "hf mfdes lsapp --no-auth", timeout=30)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("desfire_apps failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_desfire_apps(result.get("output", ""))
+
+
+async def tool_desfire_files(
+    manager: ConnectionManager,
+    session_id: str,
+    aid: str,
+) -> dict[str, Any]:
+    """Run 'hf mfdes lsfiles --no-auth --aid <AID>' to list files in a DESFire application.
+
+    Most applications require authentication, so this will typically return
+    an auth-required error. That itself is a finding (properly secured).
+    """
+    try:
+        result = manager.run_command(
+            session_id, f"hf mfdes lsfiles --no-auth --aid {aid}", timeout=15,
+        )
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("desfire_files failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_desfire_files(result.get("output", ""))

@@ -322,6 +322,61 @@ TOOL_DEFINITIONS = [
             "required": ["session_id"],
         },
     ),
+    Tool(
+        name="desfire_info",
+        description=(
+            "Run 'hf mfdes info' on a DESFire tag. Returns UID, version, "
+            "storage, applications, auth methods, signature verification. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="desfire_apps",
+        description=(
+            "Enumerate DESFire applications without authentication. "
+            "Returns AIDs, descriptions, and auth requirements per app. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="desfire_files",
+        description=(
+            "List files in a DESFire application (typically requires auth). "
+            "An auth-required error is itself a finding: properly secured. [read-only]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID returned by connect",
+                },
+                "aid": {
+                    "type": "string",
+                    "description": "Application ID (hex, e.g. 000357)",
+                },
+            },
+            "required": ["session_id", "aid"],
+        },
+    ),
 ]
 
 
@@ -443,6 +498,25 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 manager=connection_manager,
                 session_id=arguments["session_id"],
                 key_list=arguments.get("key_list"),
+            )
+
+        elif name == "desfire_info":
+            result = await tools.tool_desfire_info(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "desfire_apps":
+            result = await tools.tool_desfire_apps(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "desfire_files":
+            result = await tools.tool_desfire_files(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                aid=arguments["aid"],
             )
 
         else:
