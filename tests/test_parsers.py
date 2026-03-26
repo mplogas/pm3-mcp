@@ -22,6 +22,8 @@ from pm3_mcp.parsers import (
     parse_desfire_apps,
     parse_detect_tag,
     parse_desfire_files,
+    parse_trace_list,
+    parse_hw_trace_status,
 )
 
 
@@ -587,3 +589,66 @@ class TestParseDetectTag:
         assert result["found"] is False
         assert result["protocol"] is None
         assert result["suggested_tools"] == []
+
+
+# ---------------------------------------------------------------------------
+# parse_trace_list
+# ---------------------------------------------------------------------------
+
+class TestParseTraceList:
+    def test_extracts_exchanges(self, trace_list_iso15693_output):
+        result = parse_trace_list(trace_list_iso15693_output)
+        assert len(result["exchanges"]) > 0
+
+    def test_exchange_fields(self, trace_list_iso15693_output):
+        result = parse_trace_list(trace_list_iso15693_output)
+        ex = result["exchanges"][0]
+        assert "src" in ex
+        assert ex["src"] in ("Rdr", "Tag")
+        assert "data_hex" in ex
+        assert "annotation" in ex
+
+    def test_reader_and_tag_present(self, trace_list_iso15693_output):
+        result = parse_trace_list(trace_list_iso15693_output)
+        sources = {e["src"] for e in result["exchanges"]}
+        assert "Rdr" in sources
+        assert "Tag" in sources
+
+    def test_exchange_count(self, trace_list_iso15693_output):
+        result = parse_trace_list(trace_list_iso15693_output)
+        assert result["exchange_count"] == len(result["exchanges"])
+
+    def test_trace_bytes(self, trace_list_iso15693_output):
+        result = parse_trace_list(trace_list_iso15693_output)
+        assert result["trace_bytes"] == 741
+
+    def test_crc_field(self, trace_list_iso15693_output):
+        result = parse_trace_list(trace_list_iso15693_output)
+        crcs = [e.get("crc") for e in result["exchanges"]]
+        assert "ok" in crcs or "!!" in crcs
+
+    def test_14a_auth_nonces(self, trace_list_14a_auth_output):
+        result = parse_trace_list(trace_list_14a_auth_output)
+        assert len(result["auth_nonces"]) > 0
+        nonce = result["auth_nonces"][0]
+        assert "nt" in nonce
+        assert "nr_ar" in nonce
+
+    def test_empty_trace(self, trace_list_empty_output):
+        result = parse_trace_list(trace_list_empty_output)
+        assert result["exchanges"] == []
+        assert result["exchange_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# parse_hw_trace_status
+# ---------------------------------------------------------------------------
+
+class TestParseHwTraceStatus:
+    def test_trace_present(self, hw_status_with_trace_output):
+        result = parse_hw_trace_status(hw_status_with_trace_output)
+        assert result["trace_len"] == 741
+
+    def test_no_trace(self, hw_status_no_trace_output):
+        result = parse_hw_trace_status(hw_status_no_trace_output)
+        assert result["trace_len"] == 0

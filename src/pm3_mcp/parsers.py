@@ -1256,3 +1256,98 @@ def parse_iclass_loclass(output: str) -> dict:
         "key": None,
         "error": error,
     }
+
+
+def parse_trace_list(output: str) -> dict:
+    """Parse output from 'trace list -t <protocol>'.
+
+    Returns:
+        exchanges: list of {start, end, src, data_hex, crc, annotation}
+        exchange_count: int
+        trace_bytes: int
+        auth_nonces: list of {nt, nr_ar, at, block} (MIFARE Classic only)
+    """
+    exchanges = []
+    auth_nonces = []
+
+    # Extract trace byte count: "Recorded activity ( 741 bytes )"
+    bytes_match = re.search(r"Recorded activity\s*\(\s*(\d+)\s*bytes\s*\)", output)
+    trace_bytes = int(bytes_match.group(1)) if bytes_match else 0
+
+    # Parse table rows:
+    # Start | End | Src | Data | CRC | Annotation
+    row_re = re.compile(
+        r"(\d+)\s+\|\s+(\d+)\s+\|\s+(Rdr|Tag)\s+\|"
+        r"((?:[0-9A-Fa-f]{2}\s*)+(?:!\s*)?)\s*\|"
+        r"\s*([^\|]*)\|\s*(.*)"
+    )
+
+    for line in output.splitlines():
+        m = row_re.search(line)
+        if m:
+            data_hex = m.group(4).strip().rstrip("!")
+            # Clean up extra spaces
+            data_hex = " ".join(data_hex.split())
+            crc = m.group(5).strip() if m.group(5).strip() else None
+            annotation = m.group(6).strip() if m.group(6).strip() else None
+
+            exchanges.append({
+                "start": int(m.group(1)),
+                "end": int(m.group(2)),
+                "src": m.group(3),
+                "data_hex": data_hex,
+                "crc": crc,
+                "annotation": annotation,
+            })
+
+    # Extract MIFARE Classic auth nonces from the exchange sequence
+    # Pattern: Rdr sends 60/61 XX (AUTH), Tag responds with nt,
+    #          Rdr sends nr+ar, Tag responds with at
+    i = 0
+    while i < len(exchanges) - 3:
+        ex = exchanges[i]
+        if ex["src"] == "Rdr":
+            data_bytes = ex["data_hex"].replace(" ", "")
+            # AUTH-A (60) or AUTH-B (61)
+            if len(data_bytes) >= 4 and data_bytes[:2] in ("60", "61"):
+                block = int(data_bytes[2:4], 16)
+                key_type = "A" if data_bytes[:2] == "60" else "B"
+                # Next should be Tag nonce (nt)
+                if i + 1 < len(exchanges) and exchanges[i + 1]["src"] == "Tag":
+                    nt = exchanges[i + 1]["data_hex"].replace(" ", "")
+                    nr_ar = None
+                    at = None
+                    # Next should be Rdr nr+ar
+                    if i + 2 < len(exchanges) and exchanges[i + 2]["src"] == "Rdr":
+                        nr_ar = exchanges[i + 2]["data_hex"].replace(" ", "")
+                    # Next should be Tag at
+                    if i + 3 < len(exchanges) and exchanges[i + 3]["src"] == "Tag":
+                        at = exchanges[i + 3]["data_hex"].replace(" ", "")
+
+                    auth_nonces.append({
+                        "block": block,
+                        "key_type": key_type,
+                        "nt": nt,
+                        "nr_ar": nr_ar,
+                        "at": at,
+                    })
+                    i += 4
+                    continue
+        i += 1
+
+    return {
+        "exchanges": exchanges,
+        "exchange_count": len(exchanges),
+        "trace_bytes": trace_bytes,
+        "auth_nonces": auth_nonces,
+    }
+
+
+def parse_hw_trace_status(output: str) -> dict:
+    """Extract traceLen from hw status output.
+
+    Returns:
+        trace_len: int (bytes in trace buffer, 0 if empty)
+    """
+    m = re.search(r"traceLen\s*[.]+\s*(\d+)", output)
+    return {"trace_len": int(m.group(1)) if m else 0}

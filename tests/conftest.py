@@ -576,3 +576,68 @@ def auto_no_tag_output():
 [=] Couldn't identify a chipset
 [=] hf search
 [!] No known/supported 13.56 MHz tags found"""
+
+
+@pytest.fixture
+def trace_list_iso15693_output():
+    """Real decoded trace output from ISO 15693 sniff (captured 2026-03-26)."""
+    return """[+] Recorded activity ( 741 bytes )
+[=] start = start of start frame. end = end of frame. src = source of transfer.
+[=] ISO15693 / iCLASS - all times are in carrier periods (1/13.56MHz)
+
+      Start |        End | Src | Data (! denotes parity error)                                           | CRC | Annotation
+------------+------------+-----+-------------------------------------------------------------------------+-----+--------------------
+          0 |      17920 | Rdr |02  E4  00  44                                                           |  !! | Proprietary IC MFG dependent
+      35552 |     109280 | Tag |00  0F  F8  10  DB  6A  00  01  04  E0  00  00  1B  03  01  B9  8A       |  ok |
+     107456 |     137664 | Rdr |02  20  00  47  EC  06  44                                               |  !! | READBLOCK(0)
+     143776 |     176544 | Tag |00  00  00  00  00  77  CF                                               |  ok |
+     442400 |     460320 | Rdr |02  E4  02  44                                                           |  !! | Proprietary IC MFG dependent
+     685888 |     707904 | Rdr |02  20  0A  1D  FF                                                       |  ok | READBLOCK(10)
+     712352 |     745120 | Tag |00  00  00  00  00  77  CF                                               |  ok |"""
+
+
+@pytest.fixture
+def trace_list_14a_auth_output():
+    """Simulated decoded trace for MIFARE Classic authentication exchange."""
+    return """[+] Recorded activity ( 256 bytes )
+[=] start = start of start frame. end = end of frame. src = source of transfer.
+[=] ISO14443-A - all times are in carrier periods (1/13.56MHz)
+
+      Start |        End | Src | Data (! denotes parity error)                                           | CRC | Annotation
+------------+------------+-----+-------------------------------------------------------------------------+-----+--------------------
+          0 |        992 | Rdr |26                                                                       |     | REQA
+       2228 |       4596 | Tag |04  00                                                                   |     | ATQA
+       7040 |       9504 | Rdr |93  20                                                                   |     | ANTICOLL
+      11612 |      18412 | Tag |AD  6F  EF  EC  97                                                       |     | UID BCC
+      20000 |      30000 | Rdr |60  00  F5  7B                                                           |  ok | AUTH-A(0)
+      32000 |      36000 | Tag |AB  CD  12  34                                                           |     | TAG NONCE
+      38000 |      46000 | Rdr |01  02  03  04  05  06  07  08                                           |     | NR AR (encrypted)
+      48000 |      52000 | Tag |09  0A  0B  0C                                                           |     | AT (encrypted)"""
+
+
+@pytest.fixture
+def trace_list_empty_output():
+    """Output when trace buffer is empty."""
+    return """[-] You requested a trace list but there is no trace.
+[-] Consider using `trace load` or removing parameter `-1`"""
+
+
+@pytest.fixture
+def hw_status_with_trace_output():
+    """hw status output with traceLen > 0."""
+    return """[usb|script] pm3 --> hw status
+[#] Memory
+[#]   BigBuf_size............. 36948
+[#]   Available memory........ 36948
+[#] Tracing
+[#]   tracing ................ 0
+[#]   traceLen ............... 741"""
+
+
+@pytest.fixture
+def hw_status_no_trace_output():
+    """hw status output with traceLen = 0."""
+    return """[usb|script] pm3 --> hw status
+[#] Tracing
+[#]   tracing ................ 0
+[#]   traceLen ............... 0"""
