@@ -470,7 +470,7 @@ class TestAutopwn:
         await tools.tool_autopwn(mgr, "abc12345")
 
         kwargs = mgr.run_command.call_args[1]
-        assert kwargs.get("timeout") == 300
+        assert kwargs.get("timeout") == 600
 
     @pytest.mark.asyncio
     async def test_autopwn_nonexistent_session(self):

@@ -419,13 +419,25 @@ def parse_autopwn(output: str) -> dict:
         dump_files: list of file paths generated
         execution_time_s: int
         complete: bool (all sectors recovered)
+        error: str or None (no tag, communication errors, etc.)
         raw: full output
     """
+    # Check for early failures
+    if "No tag detected" in output:
+        return {
+            "keys": [],
+            "dump_files": [],
+            "execution_time_s": 0,
+            "complete": False,
+            "error": "No tag detected. Check card positioning on the antenna.",
+            "raw": output,
+        }
+
     keys = []
     dump_files = []
     execution_time_s = 0
 
-    # Parse the key table:
+    # Primary: parse the summary key table (printed on success/partial success):
     # [+]  000 | 003 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
     key_table_re = re.compile(
         r"\[\+\]\s+(\d+)\s+\|\s+\d+\s+\|\s+([0-9A-Fa-f-]+)\s+\|\s+(\w)\s+\|\s+([0-9A-Fa-f-]+)\s+\|\s+(\w)"
@@ -444,6 +456,37 @@ def parse_autopwn(output: str) -> dict:
             "method_b": method_b,
         })
 
+    # Fallback: if no summary table, extract from individual key recovery lines.
+    # These are printed as keys are found, before the summary:
+    # [+] Target sector   0 key type A -- found valid key [ FFFFFFFFFFFF ]
+    if not keys:
+        individual_re = re.compile(
+            r"Target sector\s+(\d+)\s+key type\s+(\w)\s+--\s+found valid key\s+\[\s*([0-9A-Fa-f]+)\s*\]"
+        )
+        sector_keys: dict[int, dict] = {}
+        for m in individual_re.finditer(output):
+            sector = int(m.group(1))
+            key_type = m.group(2).upper()
+            key_val = m.group(3)
+
+            if sector not in sector_keys:
+                sector_keys[sector] = {
+                    "sector": sector,
+                    "key_a": None,
+                    "key_b": None,
+                    "method_a": None,
+                    "method_b": None,
+                }
+
+            if key_type == "A":
+                sector_keys[sector]["key_a"] = key_val
+                sector_keys[sector]["method_a"] = "?"
+            else:
+                sector_keys[sector]["key_b"] = key_val
+                sector_keys[sector]["method_b"] = "?"
+
+        keys = sorted(sector_keys.values(), key=lambda k: k["sector"])
+
     # Parse dump file paths
     for m in re.finditer(r"(?:dumped to|Saved.*?to.*?file)\s+`?([^\s`]+)`?", output):
         dump_files.append(m.group(1))
@@ -453,8 +496,19 @@ def parse_autopwn(output: str) -> dict:
     if time_match:
         execution_time_s = int(time_match.group(1))
 
-    # Complete if no keys are None
-    complete = len(keys) > 0 and all(
+    # Detect errors
+    error = None
+    if "No match for the First_Byte_Sum" in output:
+        error = (
+            "Hardnested attack failed (First_Byte_Sum mismatch). "
+            "Card may have non-standard crypto or poor RF coupling. "
+            "Try repositioning the card or using a different known key."
+        )
+    elif "Auth error" in output and not keys:
+        error = "Authentication errors during nonce collection. Check card positioning."
+
+    # Complete if we have all 16 sectors with both keys
+    complete = len(keys) >= 16 and all(
         k["key_a"] is not None and k["key_b"] is not None for k in keys
     )
 
@@ -463,6 +517,7 @@ def parse_autopwn(output: str) -> dict:
         "dump_files": dump_files,
         "execution_time_s": execution_time_s,
         "complete": complete,
+        "error": error,
         "raw": output,
     }
 

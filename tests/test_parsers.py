@@ -403,3 +403,48 @@ class TestParseChkKeys:
         s0 = next(k for k in result["keys"] if k["sector"] == 0)
         assert s0["key_a"] == "FFFFFFFFFFFF"
         assert s0["key_b"] == "FFFFFFFFFFFF"
+
+
+# ---------------------------------------------------------------------------
+# parse_autopwn edge cases
+# ---------------------------------------------------------------------------
+
+class TestParseAutopwnNoTag:
+    def test_no_tag_returns_error(self, autopwn_no_tag_output):
+        result = parse_autopwn(autopwn_no_tag_output)
+        assert result["complete"] is False
+        assert result["error"] is not None
+        assert "No tag" in result["error"]
+        assert result["keys"] == []
+
+    def test_no_tag_has_zero_keys(self, autopwn_no_tag_output):
+        result = parse_autopwn(autopwn_no_tag_output)
+        assert len(result["keys"]) == 0
+
+
+class TestParseAutopwnPartialNoTable:
+    def test_extracts_keys_from_individual_lines(self, autopwn_partial_no_table_output):
+        result = parse_autopwn(autopwn_partial_no_table_output)
+        assert len(result["keys"]) == 3  # sectors 0, 2, 3
+
+    def test_sector_0_keys(self, autopwn_partial_no_table_output):
+        result = parse_autopwn(autopwn_partial_no_table_output)
+        s0 = next(k for k in result["keys"] if k["sector"] == 0)
+        assert s0["key_a"] == "FFFFFFFFFFFF"
+        assert s0["key_b"] == "FFFFFFFFFFFF"
+
+    def test_not_complete(self, autopwn_partial_no_table_output):
+        result = parse_autopwn(autopwn_partial_no_table_output)
+        assert result["complete"] is False
+
+    def test_has_hardnested_error(self, autopwn_partial_no_table_output):
+        result = parse_autopwn(autopwn_partial_no_table_output)
+        assert result["error"] is not None
+        assert "First_Byte_Sum" in result["error"] or "hardnested" in result["error"].lower()
+
+    def test_existing_all_default_still_works(self, autopwn_all_default_output):
+        """Make sure the existing summary table parsing still works."""
+        result = parse_autopwn(autopwn_all_default_output)
+        assert result["complete"] is True
+        assert len(result["keys"]) == 16
+        assert result["error"] is None

@@ -371,3 +371,37 @@ def chk_keys_output():
 [+]  003 | 015 | FFFFFFFFFFFF | 1 | FFFFFFFFFFFF | 1
 [+] -----+-----+--------------+---+--------------+----
 [+] ( 0:Failed / 1:Success )"""
+
+
+@pytest.fixture
+def autopwn_no_tag_output():
+    """Real output from autopwn with no tag on reader."""
+    return """[usb|script] pm3 --> hf mf autopwn
+[-] No tag detected or other tag communication error
+[?] Hint: Try some distance or position of the card"""
+
+
+@pytest.fixture
+def autopwn_partial_no_table_output():
+    """Real output from autopwn that found some keys but failed hardnested.
+
+    No summary table printed. Only individual key recovery lines.
+    """
+    return """[usb|script] pm3 --> hf mf autopwn
+
+[!] Known key failed. Can't authenticate to block   0 key type A
+[+] loaded 5 user keys
+[+] loaded 61 hardcoded keys
+[=] Running strategy 1
+[=] .
+[=] Running strategy 2
+[=] .
+[+] Target sector   0 key type A -- found valid key [ FFFFFFFFFFFF ] (used for nested / hardnested attack)
+[+] Target sector   0 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   2 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   2 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   3 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   3 key type B -- found valid key [ FFFFFFFFFFFF ]
+[#] AcquireEncryptedNonces: Auth1 error
+[#] AcquireEncryptedNonces: Auth1 error
+[-] No match for the First_Byte_Sum (130), is the card a genuine MFC Ev1?"""
