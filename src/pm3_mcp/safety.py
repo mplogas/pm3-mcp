@@ -32,6 +32,10 @@ _TOOL_TIERS: dict[str, SafetyTier] = {
     "desfire_info": SafetyTier.READ_ONLY,
     "desfire_apps": SafetyTier.READ_ONLY,
     "desfire_files": SafetyTier.READ_ONLY,
+    "iclass_info": SafetyTier.READ_ONLY,
+    "iclass_rdbl": SafetyTier.READ_ONLY,
+    "iso15693_info": SafetyTier.READ_ONLY,
+    "iso15693_rdbl": SafetyTier.READ_ONLY,
     "connect": SafetyTier.ALLOWED_WRITE,
     "disconnect": SafetyTier.ALLOWED_WRITE,
 }

@@ -451,3 +451,91 @@ async def tool_desfire_files(
         return {"error": str(exc)}
 
     return parsers.parse_desfire_files(result.get("output", ""))
+
+
+# ---------------------------------------------------------------------------
+# iCLASS / PicoPass
+# ---------------------------------------------------------------------------
+
+async def tool_iclass_info(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Run 'hf iclass info' to get iCLASS tag details."""
+    try:
+        result = manager.run_command(session_id, "hf iclass info", timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iclass_info failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_iclass_info(result.get("output", ""))
+
+
+async def tool_iclass_rdbl(
+    manager: ConnectionManager,
+    session_id: str,
+    block_num: int,
+    key: str | None = None,
+    credit: bool = False,
+) -> dict[str, Any]:
+    """Read an iCLASS block.
+
+    key: 8-byte hex key. If None, tries without auth (blocks 0-4 are usually readable).
+    credit: use credit key instead of debit key.
+    """
+    command = f"hf iclass rdbl --blk {block_num}"
+    if key:
+        command += f" -k {key}"
+        if credit:
+            command += " --credit"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iclass_rdbl failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_iclass_rdbl(result.get("output", ""))
+
+
+# ---------------------------------------------------------------------------
+# ISO 15693
+# ---------------------------------------------------------------------------
+
+async def tool_iso15693_info(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Run 'hf 15 info' to get ISO 15693 tag details."""
+    try:
+        result = manager.run_command(session_id, "hf 15 info", timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iso15693_info failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_iso15693_info(result.get("output", ""))
+
+
+async def tool_iso15693_rdbl(
+    manager: ConnectionManager,
+    session_id: str,
+    block_num: int,
+) -> dict[str, Any]:
+    """Read an ISO 15693 block."""
+    command = f"hf 15 rdbl -b {block_num} -*"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iso15693_rdbl failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_iso15693_rdbl(result.get("output", ""))

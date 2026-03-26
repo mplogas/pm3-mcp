@@ -9,7 +9,8 @@ class TestClassifyTool:
         for tool in ["hw_status", "detect_tag", "hf_info", "lf_info",
                      "read_block", "dump_tag",
                      "autopwn", "darkside", "nested", "hardnested", "chk_keys",
-                     "desfire_info", "desfire_apps", "desfire_files"]:
+                     "desfire_info", "desfire_apps", "desfire_files",
+                     "iclass_info", "iclass_rdbl", "iso15693_info", "iso15693_rdbl"]:
             assert classify_tool(tool) == SafetyTier.READ_ONLY
 
     def test_allowed_write_tools(self):

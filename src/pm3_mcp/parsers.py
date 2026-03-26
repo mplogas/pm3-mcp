@@ -967,3 +967,202 @@ def parse_desfire_files(output: str) -> dict:
         "files": files,
         "error": None,
     }
+
+
+def parse_iclass_info(output: str) -> dict:
+    """Parse output from 'hf iclass info'.
+
+    Returns:
+        found: bool
+        csn: str or None (Card Serial Number / UID)
+        card_type: str or None
+        raw: full output
+        error: str or None
+    """
+    if "no tag found" in output.lower() or "can't select" in output.lower():
+        return {
+            "found": False,
+            "csn": None,
+            "card_type": None,
+            "error": "No iCLASS tag detected.",
+            "raw": output,
+        }
+
+    csn = _extract(r"CSN:\s*([0-9A-Fa-f ]+)", output)
+    if not csn:
+        csn = _extract(r"Serial number:\s*([0-9A-Fa-f ]+)", output)
+
+    card_type = _extract(r"Card type:\s*(.+)", output)
+    if not card_type:
+        # Try alternative format
+        card_type = _extract(r"Type:\s*(.+?)(?:\n|$)", output)
+
+    return {
+        "found": csn is not None,
+        "csn": csn.replace(" ", "") if csn else None,
+        "card_type": card_type.strip() if card_type else None,
+        "error": None,
+        "raw": output,
+    }
+
+
+def parse_iclass_rdbl(output: str) -> dict:
+    """Parse output from 'hf iclass rdbl'.
+
+    Returns:
+        success: bool
+        block: int or None
+        hex: str or None
+        ascii: str or None
+        bytes: int or None
+        error: str or None
+    """
+    # Success: block data line with hex bytes
+    # Various formats: "Block XX: AA BB CC DD EE FF GG HH"
+    block_match = re.search(
+        r"[Bb]lock\s+(\d+)[:\s]+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)",
+        output,
+    )
+    if block_match:
+        block_num = int(block_match.group(1))
+        hex_str = block_match.group(2).strip()
+        byte_vals = [int(b, 16) for b in hex_str.split()]
+        ascii_text = "".join(chr(b) if 32 <= b < 127 else "." for b in byte_vals)
+        return {
+            "success": True,
+            "block": block_num,
+            "hex": hex_str,
+            "ascii": ascii_text,
+            "bytes": len(byte_vals),
+            "error": None,
+        }
+
+    # Also try table format: [=] N | HH HH HH ... | ascii
+    table_match = re.search(
+        r"\[=\]\s+(\d+)\s+\|\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)\s+\|",
+        output,
+    )
+    if table_match:
+        block_num = int(table_match.group(1))
+        hex_str = table_match.group(2).strip()
+        byte_vals = [int(b, 16) for b in hex_str.split()]
+        ascii_text = "".join(chr(b) if 32 <= b < 127 else "." for b in byte_vals)
+        return {
+            "success": True,
+            "block": block_num,
+            "hex": hex_str,
+            "ascii": ascii_text,
+            "bytes": len(byte_vals),
+            "error": None,
+        }
+
+    error = None
+    if "auth" in output.lower() or "key" in output.lower():
+        error = "Authentication failed. Wrong key or key not provided."
+    elif "no tag" in output.lower():
+        error = "No tag detected."
+    else:
+        error = "Block read failed."
+
+    return {
+        "success": False,
+        "block": None,
+        "hex": None,
+        "ascii": None,
+        "bytes": None,
+        "error": error,
+    }
+
+
+def parse_iso15693_info(output: str) -> dict:
+    """Parse output from 'hf 15 info'.
+
+    Returns:
+        found: bool
+        uid: str or None
+        tag_type: str or None
+        manufacturer: str or None
+        raw: full output
+        error: str or None
+    """
+    if "no tag found" in output.lower():
+        return {
+            "found": False,
+            "uid": None,
+            "tag_type": None,
+            "manufacturer": None,
+            "error": "No ISO 15693 tag detected.",
+            "raw": output,
+        }
+
+    uid = _extract(r"UID[.:\s]+([0-9A-Fa-f ]+)", output)
+    tag_type = _extract(r"TYPE[:\s]+(.+?)(?:\n|$)", output)
+    if not tag_type:
+        tag_type = _extract(r"TYPE MATCH\s+(.+?)(?:\n|$)", output)
+
+    manufacturer = _extract(r"(?:Manufacturer|Vendor)[:\s]+(.+?)(?:\n|$)", output)
+    if not manufacturer and tag_type:
+        # Extract manufacturer from TYPE MATCH line: "NXP (Philips); IC SL2..."
+        mfr_match = re.search(r"([A-Z][A-Za-z]+(?:\s*\([^)]+\))?)", tag_type)
+        if mfr_match:
+            manufacturer = mfr_match.group(1)
+
+    return {
+        "found": uid is not None,
+        "uid": uid.replace(" ", "") if uid else None,
+        "tag_type": tag_type.strip() if tag_type else None,
+        "manufacturer": manufacturer.strip() if manufacturer else None,
+        "error": None,
+        "raw": output,
+    }
+
+
+def parse_iso15693_rdbl(output: str) -> dict:
+    """Parse output from 'hf 15 rdbl'.
+
+    Returns:
+        success: bool
+        block: int or None
+        hex: str or None
+        bytes: int or None
+        error: str or None
+    """
+    # Success format varies, look for hex data after block number
+    block_match = re.search(
+        r"[Bb]lock\s+(\d+)[:\s]+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)",
+        output,
+    )
+    if block_match:
+        block_num = int(block_match.group(1))
+        hex_str = block_match.group(2).strip()
+        return {
+            "success": True,
+            "block": block_num,
+            "hex": hex_str,
+            "bytes": len(hex_str.split()),
+            "error": None,
+        }
+
+    # Table format
+    table_match = re.search(
+        r"\[=\]\s+(\d+)\s+\|\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)",
+        output,
+    )
+    if table_match:
+        block_num = int(table_match.group(1))
+        hex_str = table_match.group(2).strip()
+        return {
+            "success": True,
+            "block": block_num,
+            "hex": hex_str,
+            "bytes": len(hex_str.split()),
+            "error": None,
+        }
+
+    return {
+        "success": False,
+        "block": None,
+        "hex": None,
+        "bytes": None,
+        "error": "Block read failed.",
+    }

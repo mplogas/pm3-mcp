@@ -377,6 +377,54 @@ TOOL_DEFINITIONS = [
             "required": ["session_id", "aid"],
         },
     ),
+    Tool(
+        name="iclass_info",
+        description="Get iCLASS / PicoPass tag information (CSN, card type). [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="iclass_rdbl",
+        description="Read an iCLASS / PicoPass block. Blocks 0-4 are usually readable without a key. [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "block_num": {"type": "integer", "description": "Block number to read"},
+                "key": {"type": "string", "description": "8-byte hex key (omit for unauthenticated read)"},
+                "credit": {"type": "boolean", "default": False, "description": "Use credit key instead of debit key"},
+            },
+            "required": ["session_id", "block_num"],
+        },
+    ),
+    Tool(
+        name="iso15693_info",
+        description="Get ISO 15693 tag information (UID, type, manufacturer). [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+            },
+            "required": ["session_id"],
+        },
+    ),
+    Tool(
+        name="iso15693_rdbl",
+        description="Read an ISO 15693 block. [read-only]",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "block_num": {"type": "integer", "description": "Block number to read"},
+            },
+            "required": ["session_id", "block_num"],
+        },
+    ),
 ]
 
 
@@ -517,6 +565,34 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 manager=connection_manager,
                 session_id=arguments["session_id"],
                 aid=arguments["aid"],
+            )
+
+        elif name == "iclass_info":
+            result = await tools.tool_iclass_info(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "iclass_rdbl":
+            result = await tools.tool_iclass_rdbl(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                block_num=arguments["block_num"],
+                key=arguments.get("key"),
+                credit=arguments.get("credit", False),
+            )
+
+        elif name == "iso15693_info":
+            result = await tools.tool_iso15693_info(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+            )
+
+        elif name == "iso15693_rdbl":
+            result = await tools.tool_iso15693_rdbl(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                block_num=arguments["block_num"],
             )
 
         else:
