@@ -264,7 +264,9 @@ async def tool_autopwn(
     if artifacts_path is None:
         return {"error": f"session not found: {session_id}"}
 
-    command = f"hf mf autopwn -f {artifacts_path}/dump"
+    # autopwn generates hf-mf-<UID>-dump.bin/.json/-key.bin in the cwd.
+    # -f is for dictionary input, not output path.
+    command = "hf mf autopwn"
 
     try:
         result = manager.run_command(session_id, command, timeout=300)

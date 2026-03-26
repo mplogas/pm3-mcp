@@ -451,17 +451,15 @@ class TestAutopwn:
         assert len(result["keys"]) == 16
 
     @pytest.mark.asyncio
-    async def test_autopwn_uses_artifacts_path(self, autopwn_all_default_output, tmp_path):
-        artifacts = tmp_path / "artifacts"
+    async def test_autopwn_command_is_plain(self, autopwn_all_default_output, tmp_path):
         mgr = _make_manager()
-        mgr.get_artifacts_path.return_value = artifacts
+        mgr.get_artifacts_path.return_value = tmp_path / "artifacts"
         mgr.run_command.return_value = _run_ok(autopwn_all_default_output)
 
         await tools.tool_autopwn(mgr, "abc12345")
 
         cmd = mgr.run_command.call_args[0][1]
-        assert str(artifacts) in cmd
-        assert "dump" in cmd
+        assert cmd == "hf mf autopwn"
 
     @pytest.mark.asyncio
     async def test_autopwn_timeout_300(self, autopwn_all_default_output, tmp_path):
