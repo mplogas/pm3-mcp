@@ -550,6 +550,44 @@ TOOL_DEFINITIONS = [
         },
         annotations={"destructiveHint": True, "readOnlyHint": False},
     ),
+    Tool(
+        name="sniff_start",
+        description=(
+            "Start sniffing reader-tag communication. BLOCKS until user presses the PM3 button. "
+            "Position the PM3 between reader and tag before calling. [allowed-write]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "protocol": {
+                    "type": "string",
+                    "enum": ["14a", "iclass", "15693"],
+                    "description": "Protocol to sniff: 14a (MIFARE), iclass, or 15693",
+                },
+            },
+            "required": ["session_id", "protocol"],
+        },
+    ),
+    Tool(
+        name="sniff_stop",
+        description=(
+            "Retrieve and decode sniffed trace data. Call after sniff_start completes "
+            "(user pressed PM3 button). Saves trace file and returns decoded exchanges. [allowed-write]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string", "description": "Session ID returned by connect"},
+                "protocol": {
+                    "type": "string",
+                    "enum": ["14a", "iclass", "15693"],
+                    "description": "Protocol that was sniffed (must match sniff_start)",
+                },
+            },
+            "required": ["session_id", "protocol"],
+        },
+    ),
 ]
 
 
@@ -784,6 +822,20 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 session_id=arguments["session_id"],
                 block_num=arguments["block_num"],
                 data=arguments["data"],
+            )
+
+        elif name == "sniff_start":
+            result = await tools.tool_sniff_start(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                protocol=arguments["protocol"],
+            )
+
+        elif name == "sniff_stop":
+            result = await tools.tool_sniff_stop(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                protocol=arguments["protocol"],
             )
 
         else:
