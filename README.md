@@ -76,6 +76,8 @@ Set `PIDEV_ENGAGEMENTS_DIR` to control where engagement logs are written. Defaul
 | `iso15693_dump` | read-only | Dump ISO 15693 tag memory to file |
 | `connect` | allowed-write | Validate PM3, create engagement folder |
 | `disconnect` | allowed-write | Finalize command log |
+| `sniff_start` | allowed-write | Start sniffing reader-tag communication (blocks until PM3 button press) |
+| `sniff_stop` | allowed-write | Retrieve and decode sniffed trace data |
 | `mf_wrbl` | approval-write | Write a MIFARE Classic block (requires confirmation) |
 | `mf_restore` | approval-write | Restore full dump to MIFARE Classic tag (requires confirmation) |
 | `iclass_wrbl` | approval-write | Write an iCLASS block (requires confirmation) |
