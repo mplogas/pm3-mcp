@@ -1096,9 +1096,10 @@ def parse_iso15693_info(output: str) -> dict:
         }
 
     uid = _extract(r"UID[.:\s]+([0-9A-Fa-f ]+)", output)
-    tag_type = _extract(r"TYPE[:\s]+(.+?)(?:\n|$)", output)
+    # Check "TYPE MATCH" first (more specific), then fall back to "TYPE:"
+    tag_type = _extract(r"TYPE MATCH\s+(.+?)(?:\n|$)", output)
     if not tag_type:
-        tag_type = _extract(r"TYPE MATCH\s+(.+?)(?:\n|$)", output)
+        tag_type = _extract(r"TYPE[:\s]+(.+?)(?:\n|$)", output)
 
     manufacturer = _extract(r"(?:Manufacturer|Vendor)[:\s]+(.+?)(?:\n|$)", output)
     if not manufacturer and tag_type:
@@ -1143,9 +1144,28 @@ def parse_iso15693_rdbl(output: str) -> dict:
             "error": None,
         }
 
-    # Table format
+    # ISO 15693 table format: [=] HH HH HH HH | N | ascii
+    # The hex data comes first, then | lock_flag | ascii
+    iso_table_match = re.search(
+        r"\[=\]\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)\s+\|",
+        output,
+    )
+    if iso_table_match:
+        hex_str = iso_table_match.group(1).strip()
+        # Extract block number from the header line: "#  N"
+        blk_match = re.search(r"#\s+(\d+)", output)
+        block_num = int(blk_match.group(1)) if blk_match else 0
+        return {
+            "success": True,
+            "block": block_num,
+            "hex": hex_str,
+            "bytes": len(hex_str.split()),
+            "error": None,
+        }
+
+    # Generic table format: [=] N | HH HH HH ... | ascii
     table_match = re.search(
-        r"\[=\]\s+(\d+)\s+\|\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)",
+        r"\[=\]\s+(\d+)\s+\|\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)\s+\|",
         output,
     )
     if table_match:
