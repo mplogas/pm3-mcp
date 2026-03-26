@@ -42,6 +42,8 @@ _TOOL_TIERS: dict[str, SafetyTier] = {
     "iclass_loclass": SafetyTier.READ_ONLY,
     "connect": SafetyTier.ALLOWED_WRITE,
     "disconnect": SafetyTier.ALLOWED_WRITE,
+    "sniff_start": SafetyTier.ALLOWED_WRITE,
+    "sniff_stop": SafetyTier.ALLOWED_WRITE,
     "mf_wrbl": SafetyTier.APPROVAL_WRITE,
     "mf_restore": SafetyTier.APPROVAL_WRITE,
     "iclass_wrbl": SafetyTier.APPROVAL_WRITE,

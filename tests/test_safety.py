@@ -15,7 +15,7 @@ class TestClassifyTool:
             assert classify_tool(tool) == SafetyTier.READ_ONLY
 
     def test_allowed_write_tools(self):
-        for tool in ["connect", "disconnect"]:
+        for tool in ["connect", "disconnect", "sniff_start", "sniff_stop"]:
             assert classify_tool(tool) == SafetyTier.ALLOWED_WRITE
 
     def test_approval_write_tools(self):
