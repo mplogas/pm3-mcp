@@ -20,6 +20,7 @@ from pm3_mcp.parsers import (
     sector_to_trailer,
     parse_desfire_info,
     parse_desfire_apps,
+    parse_detect_tag,
     parse_desfire_files,
 )
 
@@ -529,3 +530,60 @@ class TestParseDesfireFiles:
         result = parse_desfire_files(desfire_lsfiles_auth_required_output)
         assert result["success"] is False
         assert "auth" in result["error"].lower()
+
+
+# ---------------------------------------------------------------------------
+# parse_detect_tag (smart routing)
+# ---------------------------------------------------------------------------
+
+class TestParseDetectTag:
+    def test_mifare_classic(self, auto_mifare_classic_output):
+        result = parse_detect_tag(auto_mifare_classic_output)
+        assert result["found"] is True
+        assert result["frequency"] == "hf"
+        assert result["protocol"] == "mifare_classic"
+        assert result["tag_type"] == "MIFARE Classic 1K"
+        assert result["uid"] == "AD6FEFEC"
+        assert result["details"]["prng"] == "weak"
+        assert "autopwn" in result["suggested_tools"]
+
+    def test_mifare_classic_static_nonce(self, auto_mifare_classic_output):
+        result = parse_detect_tag(auto_mifare_classic_output)
+        assert result["details"].get("static_nonce") is True
+
+    def test_desfire(self, auto_desfire_output):
+        result = parse_detect_tag(auto_desfire_output)
+        assert result["found"] is True
+        assert result["frequency"] == "hf"
+        assert result["protocol"] == "mifare_desfire"
+        assert result["tag_type"] == "MIFARE DESFire EV2"
+        assert result["uid"] == "04406C62241290"
+        assert "desfire_info" in result["suggested_tools"]
+
+    def test_hid_prox(self, auto_hid_prox_output):
+        result = parse_detect_tag(auto_hid_prox_output)
+        assert result["found"] is True
+        assert result["frequency"] == "lf"
+        assert result["protocol"] == "hid_prox"
+        assert result["details"]["facility_code"] == 150
+        assert result["details"]["card_number"] == 20182
+
+    def test_em410x(self, auto_em410x_output):
+        result = parse_detect_tag(auto_em410x_output)
+        assert result["found"] is True
+        assert result["frequency"] == "lf"
+        assert result["protocol"] == "em410x"
+        assert result["uid"] == "EA002B1E14"
+
+    def test_iso15693(self, auto_iso15693_output):
+        result = parse_detect_tag(auto_iso15693_output)
+        assert result["found"] is True
+        assert result["frequency"] == "hf"
+        assert result["protocol"] == "iso15693"
+        assert "NXP" in result["tag_type"]
+
+    def test_no_tag(self, auto_no_tag_output):
+        result = parse_detect_tag(auto_no_tag_output)
+        assert result["found"] is False
+        assert result["protocol"] is None
+        assert result["suggested_tools"] == []

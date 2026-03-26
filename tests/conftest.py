@@ -501,3 +501,78 @@ def desfire_lsfiles_auth_required_output():
     """Output from 'hf mfdes lsfiles' when auth is required."""
     return """[usb|script] pm3 --> hf mfdes lsfiles --no-auth --aid 000357
 [!!] Desfire GetFileIDList command error. Result: -20"""
+
+
+@pytest.fixture
+def auto_mifare_classic_output():
+    """Real auto output detecting a MIFARE Classic 1K with weak PRNG."""
+    return """[usb|script] pm3 --> auto
+[=] lf search
+[=] Couldn't identify a chipset
+[=] hf search
+[+]  UID: AD 6F EF EC   ( ONUID, re-used )
+[+] ATQA: 00 04
+[+]  SAK: 08 [2]
+[+] Possible types:
+[+]    MIFARE Classic 1K
+[+] Prng detection..... weak
+[+] Static nonce....... yes
+[+] Valid ISO 14443-A tag found"""
+
+
+@pytest.fixture
+def auto_desfire_output():
+    """Real auto output detecting a DESFire EV2."""
+    return """[usb|script] pm3 --> auto
+[=] lf search
+[=] Couldn't identify a chipset
+[=] hf search
+[+]  UID: 04 40 6C 62 24 12 90   ( double )
+[+] ATQA: 03 44
+[+]  SAK: 20 [1]
+[+] Possible types:
+[+]    MIFARE DESFire EV2
+[+] ATS: 06 75 77 81 02 80 [ 02 F0 ]
+[+] Valid ISO 14443-A tag found"""
+
+
+@pytest.fixture
+def auto_hid_prox_output():
+    """Real auto output detecting an HID Prox LF tag."""
+    return """[usb|script] pm3 --> auto
+[=] lf search
+[+] [H10301  ] HID H10301 26-bit                FC: 150  CN: 20182  parity ( ok )
+[=] raw: 0000000000000020072c9dad
+[+] Valid HID Prox ID found!"""
+
+
+@pytest.fixture
+def auto_em410x_output():
+    """Real auto output detecting an EM410x LF tag."""
+    return """[usb|script] pm3 --> auto
+[=] lf search
+[+] EM 410x ID EA002B1E14
+[+] EM410x ( RF/64 )
+[+] Valid EM410x ID found!"""
+
+
+@pytest.fixture
+def auto_iso15693_output():
+    """Real auto output detecting an ISO 15693 tag."""
+    return """[usb|script] pm3 --> auto
+[=] lf search
+[=] Couldn't identify a chipset
+[=] hf search
+[+] UID.... E0 04 01 00 6A DB 10 F8
+[+] TYPE MATCH NXP (Philips); IC SL2 ICS20/ICS21 ( SLI )
+[+] Valid ISO 15693 tag found"""
+
+
+@pytest.fixture
+def auto_no_tag_output():
+    """Real auto output with no tag present."""
+    return """[usb|script] pm3 --> auto
+[=] lf search
+[=] Couldn't identify a chipset
+[=] hf search
+[!] No known/supported 13.56 MHz tags found"""

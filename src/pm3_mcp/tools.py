@@ -107,7 +107,8 @@ async def tool_detect_tag(
 ) -> dict[str, Any]:
     """Run 'auto' to detect any nearby tag.
 
-    Returns {"raw": output, "success": bool} or {"error": ...}.
+    Returns structured detection result with protocol, UID, tag type,
+    and suggested_tools for the agent to call next.
     """
     try:
         result = manager.run_command(session_id, "auto", timeout=45)
@@ -117,10 +118,7 @@ async def tool_detect_tag(
         log.error("detect_tag failed: %s", exc)
         return {"error": str(exc)}
 
-    return {
-        "raw": result.get("output", ""),
-        "success": result.get("success", False),
-    }
+    return parsers.parse_detect_tag(result.get("output", ""))
 
 
 async def tool_hf_info(

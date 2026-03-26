@@ -165,27 +165,29 @@ class TestHwStatus:
 
 class TestDetectTag:
     @pytest.mark.asyncio
-    async def test_detect_tag_returns_raw_output(self):
-        output = "[+] Detected tag: MIFARE Classic 1K"
+    async def test_detect_tag_mifare_classic(self):
+        output = "[+]  UID: AD 6F EF EC\n[+] Possible types:\n[+]    MIFARE Classic 1K\n[+] Prng detection..... weak"
         mgr = _make_manager()
         mgr.run_command.return_value = _run_ok(output)
 
         result = await tools.tool_detect_tag(mgr, "abc12345")
 
-        assert result["raw"] == output
-        assert result["success"] is True
+        assert result["found"] is True
+        assert result["protocol"] == "mifare_classic"
+        assert result["uid"] == "AD6FEFEC"
+        assert "autopwn" in result["suggested_tools"]
         mgr.run_command.assert_called_once_with("abc12345", "auto", timeout=45)
 
     @pytest.mark.asyncio
     async def test_detect_tag_no_tag(self):
-        output = "[!] No tag detected"
+        output = "[=] Couldn't identify a chipset\n[!] No known/supported 13.56 MHz tags found"
         mgr = _make_manager()
         mgr.run_command.return_value = {"success": False, "output": output, "returncode": 1}
 
         result = await tools.tool_detect_tag(mgr, "abc12345")
 
-        assert result["raw"] == output
-        assert result["success"] is False
+        assert result["found"] is False
+        assert result["protocol"] is None
 
     @pytest.mark.asyncio
     async def test_detect_tag_nonexistent_session(self):

@@ -29,6 +29,167 @@ def strip_ansi(text: str) -> str:
     return text
 
 
+def parse_detect_tag(output: str) -> dict:
+    """Parse output from 'auto' and return structured detection with protocol routing.
+
+    Returns:
+        found: bool
+        frequency: "hf" | "lf" | None
+        protocol: str (e.g. "mifare_classic", "mifare_desfire", "hid_prox", "em410x",
+                       "iso15693", "iclass", "felica", "mifare_ultralight", etc.)
+        uid: str or None
+        tag_type: str or None (human-readable, e.g. "MIFARE Classic 1K")
+        details: dict (protocol-specific: atqa, sak, prng, facility_code, card_number, etc.)
+        suggested_tools: list of str (which pm3-mcp tools to call next)
+        raw: full output
+    """
+    details = {}
+    uid = None
+    tag_type = None
+    protocol = None
+    frequency = None
+    suggested_tools = []
+
+    # -- HF: MIFARE Classic --
+    if "MIFARE Classic" in output:
+        frequency = "hf"
+        protocol = "mifare_classic"
+        uid_match = re.search(r"UID:\s*([0-9A-Fa-f ]+?)(?:\s*\(|$)", output, re.MULTILINE)
+        uid = uid_match.group(1).strip().replace(" ", "") if uid_match else None
+        atqa_match = re.search(r"ATQA:\s*([0-9A-Fa-f ]+)", output)
+        sak_match = re.search(r"SAK:\s*([0-9A-Fa-f]+)", output)
+        prng_match = re.search(r"Prng detection[.]+\s*(\w+)", output)
+        magic_match = re.search(r"Magic capabilities[.]+\s*(.+)", output)
+
+        # Determine 1K vs 4K
+        if "Classic 4K" in output or "Classic 4k" in output:
+            tag_type = "MIFARE Classic 4K"
+        elif "Classic 1K" in output or "Classic 1k" in output:
+            tag_type = "MIFARE Classic 1K"
+        else:
+            tag_type = "MIFARE Classic"
+
+        details["atqa"] = atqa_match.group(1).strip().replace(" ", "") if atqa_match else None
+        details["sak"] = sak_match.group(1) if sak_match else None
+        details["prng"] = prng_match.group(1).lower() if prng_match else None
+        details["magic"] = magic_match.group(1).strip() if magic_match else None
+
+        # Static nonce detection
+        if "Static nonce" in output:
+            details["static_nonce"] = "yes" in output.split("Static nonce")[1][:20].lower()
+
+        suggested_tools = ["hf_info", "chk_keys", "autopwn", "read_block", "dump_tag"]
+
+    # -- HF: MIFARE DESFire --
+    elif "DESFire" in output:
+        frequency = "hf"
+        protocol = "mifare_desfire"
+        uid_match = re.search(r"UID:\s*([0-9A-Fa-f ]+?)(?:\s*\(|$)", output, re.MULTILINE)
+        uid = uid_match.group(1).strip().replace(" ", "") if uid_match else None
+        if "EV3" in output:
+            tag_type = "MIFARE DESFire EV3"
+        elif "EV2" in output:
+            tag_type = "MIFARE DESFire EV2"
+        elif "EV1" in output:
+            tag_type = "MIFARE DESFire EV1"
+        else:
+            tag_type = "MIFARE DESFire"
+
+        sak_match = re.search(r"SAK:\s*([0-9A-Fa-f]+)", output)
+        details["sak"] = sak_match.group(1) if sak_match else None
+        details["has_ats"] = "ATS:" in output
+
+        suggested_tools = ["desfire_info", "desfire_apps"]
+
+    # -- HF: MIFARE Ultralight --
+    elif "Ultralight" in output or "NTAG" in output:
+        frequency = "hf"
+        protocol = "mifare_ultralight"
+        uid_match = re.search(r"UID:\s*([0-9A-Fa-f ]+?)(?:\s*\(|$)", output, re.MULTILINE)
+        uid = uid_match.group(1).strip().replace(" ", "") if uid_match else None
+        if "NTAG" in output:
+            ntag_match = re.search(r"(NTAG\d+)", output)
+            tag_type = ntag_match.group(1) if ntag_match else "NTAG"
+        else:
+            tag_type = "MIFARE Ultralight"
+        suggested_tools = ["hf_info"]
+
+    # -- HF: ISO 15693 --
+    elif "ISO 15693" in output or "Valid ISO 15693" in output:
+        frequency = "hf"
+        protocol = "iso15693"
+        uid_match = re.search(r"UID[.]*\s*([0-9A-Fa-f ]+)", output)
+        uid = uid_match.group(1).strip().replace(" ", "") if uid_match else None
+        type_match = re.search(r"TYPE MATCH\s+(.+?)(?:\n|$)", output)
+        tag_type = type_match.group(1).strip() if type_match else "ISO 15693"
+        suggested_tools = ["hf_info"]
+
+    # -- HF: iCLASS --
+    elif "iCLASS" in output or "PicoPass" in output:
+        frequency = "hf"
+        protocol = "iclass"
+        tag_type = "iCLASS / PicoPass"
+        uid_match = re.search(r"CSN:\s*([0-9A-Fa-f ]+)", output)
+        uid = uid_match.group(1).strip().replace(" ", "") if uid_match else None
+        suggested_tools = ["hf_info"]
+
+    # -- HF: FeliCa --
+    elif "FeliCa" in output and "found" in output.lower():
+        frequency = "hf"
+        protocol = "felica"
+        tag_type = "FeliCa"
+        uid_match = re.search(r"IDm:\s*([0-9A-Fa-f ]+)", output)
+        uid = uid_match.group(1).strip().replace(" ", "") if uid_match else None
+        suggested_tools = ["hf_info"]
+
+    # -- LF: HID Prox --
+    elif "HID Prox" in output or "Valid HID Prox" in output:
+        frequency = "lf"
+        protocol = "hid_prox"
+        tag_type = "HID Prox"
+        fc_match = re.search(r"FC:\s*(\d+)", output)
+        cn_match = re.search(r"CN:\s*(\d+)", output)
+        raw_match = re.search(r"raw:\s*([0-9A-Fa-f]+)", output)
+        details["facility_code"] = int(fc_match.group(1)) if fc_match else None
+        details["card_number"] = int(cn_match.group(1)) if cn_match else None
+        details["raw"] = raw_match.group(1) if raw_match else None
+        uid = details.get("raw")
+        suggested_tools = ["lf_info"]
+
+    # -- LF: EM410x --
+    elif "EM 410x" in output or "EM410x" in output:
+        frequency = "lf"
+        protocol = "em410x"
+        tag_type = "EM410x"
+        id_match = re.search(r"EM 410x ID\s+([0-9A-Fa-f]+)", output)
+        uid = id_match.group(1) if id_match else None
+        suggested_tools = ["lf_info"]
+
+    # -- LF: Indala --
+    elif "Indala" in output:
+        frequency = "lf"
+        protocol = "indala"
+        tag_type = "Indala"
+        fc_match = re.search(r"FC:\s*(\d+)", output)
+        cn_match = re.search(r"CN:\s*(\d+)", output)
+        details["facility_code"] = int(fc_match.group(1)) if fc_match else None
+        details["card_number"] = int(cn_match.group(1)) if cn_match else None
+        suggested_tools = ["lf_info"]
+
+    found = protocol is not None
+
+    return {
+        "found": found,
+        "frequency": frequency,
+        "protocol": protocol,
+        "uid": uid,
+        "tag_type": tag_type,
+        "details": details,
+        "suggested_tools": suggested_tools,
+        "raw": output,
+    }
+
+
 def parse_hw_status(output: str) -> dict:
     """Parse output from 'pm3 -c hw status'.
 
