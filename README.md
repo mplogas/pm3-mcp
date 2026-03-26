@@ -106,7 +106,7 @@ Proxmark3 (iceman fw) via USB serial
 ## Tests
 
 ```bash
-pytest              # 109 tests, no PM3 hardware needed
+pytest              # 172 tests, no PM3 hardware needed
 pytest -m proxmark3 # integration tests, PM3 must be connected
 ```
 
