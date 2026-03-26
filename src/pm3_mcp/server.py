@@ -477,6 +477,79 @@ TOOL_DEFINITIONS = [
             "required": ["session_id"],
         },
     ),
+    Tool(
+        name="mf_wrbl",
+        description=(
+            "Write a MIFARE Classic block. DESTRUCTIVE: overwrites tag data permanently. [approval-write]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string"},
+                "block_num": {"type": "integer", "description": "Block number to write"},
+                "key": {"type": "string", "description": "Authentication key (12 hex chars)"},
+                "key_type": {"type": "string", "default": "A", "description": "Key type: A or B"},
+                "data": {"type": "string", "description": "Data to write (32 hex chars = 16 bytes)"},
+                "_confirmed": {"type": "boolean", "default": False, "description": "Set true to confirm execution"},
+            },
+            "required": ["session_id", "block_num", "key", "data"],
+        },
+        annotations={"destructiveHint": True, "readOnlyHint": False},
+    ),
+    Tool(
+        name="mf_restore",
+        description=(
+            "Restore a full dump to a MIFARE Classic tag. DESTRUCTIVE: overwrites entire tag. [approval-write]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string"},
+                "dump_file": {"type": "string", "description": "Path to .bin dump file"},
+                "key_file": {"type": "string", "description": "Path to key file (optional)"},
+                "tag_size": {"type": "string", "default": "1k", "description": "Tag size: 1k or 4k"},
+                "_confirmed": {"type": "boolean", "default": False, "description": "Set true to confirm execution"},
+            },
+            "required": ["session_id", "dump_file"],
+        },
+        annotations={"destructiveHint": True, "readOnlyHint": False},
+    ),
+    Tool(
+        name="iclass_wrbl",
+        description=(
+            "Write an iCLASS block. DESTRUCTIVE: overwrites tag data permanently. [approval-write]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string"},
+                "block_num": {"type": "integer", "description": "Block number to write"},
+                "key": {"type": "string", "description": "8-byte hex key"},
+                "data": {"type": "string", "description": "Data to write (16 hex chars = 8 bytes)"},
+                "credit": {"type": "boolean", "default": False, "description": "Use credit key"},
+                "_confirmed": {"type": "boolean", "default": False, "description": "Set true to confirm execution"},
+            },
+            "required": ["session_id", "block_num", "key", "data"],
+        },
+        annotations={"destructiveHint": True, "readOnlyHint": False},
+    ),
+    Tool(
+        name="iso15693_wrbl",
+        description=(
+            "Write an ISO 15693 block. DESTRUCTIVE: overwrites tag data permanently. [approval-write]"
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string"},
+                "block_num": {"type": "integer", "description": "Block number to write"},
+                "data": {"type": "string", "description": "Data to write (8 hex chars = 4 bytes)"},
+                "_confirmed": {"type": "boolean", "default": False, "description": "Set true to confirm execution"},
+            },
+            "required": ["session_id", "block_num", "data"],
+        },
+        annotations={"destructiveHint": True, "readOnlyHint": False},
+    ),
 ]
 
 
@@ -674,6 +747,43 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 manager=connection_manager,
                 session_id=arguments["session_id"],
                 trace_file=arguments.get("trace_file"),
+            )
+
+        elif name == "mf_wrbl":
+            result = await tools.tool_mf_wrbl(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                block_num=arguments["block_num"],
+                key=arguments["key"],
+                key_type=arguments.get("key_type", "A"),
+                data=arguments["data"],
+            )
+
+        elif name == "mf_restore":
+            result = await tools.tool_mf_restore(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                dump_file=arguments["dump_file"],
+                key_file=arguments.get("key_file"),
+                tag_size=arguments.get("tag_size", "1k"),
+            )
+
+        elif name == "iclass_wrbl":
+            result = await tools.tool_iclass_wrbl(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                block_num=arguments["block_num"],
+                key=arguments["key"],
+                data=arguments["data"],
+                credit=arguments.get("credit", False),
+            )
+
+        elif name == "iso15693_wrbl":
+            result = await tools.tool_iso15693_wrbl(
+                manager=connection_manager,
+                session_id=arguments["session_id"],
+                block_num=arguments["block_num"],
+                data=arguments["data"],
             )
 
         else:

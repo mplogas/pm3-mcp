@@ -18,14 +18,9 @@ class TestClassifyTool:
         for tool in ["connect", "disconnect"]:
             assert classify_tool(tool) == SafetyTier.ALLOWED_WRITE
 
-    def test_no_approval_write_tools_in_mvp(self):
-        """MVP has no approval-write tools. The tier exists for forward compat."""
-        from pm3_mcp.safety import _TOOL_TIERS
-        approval_tools = [
-            name for name, tier in _TOOL_TIERS.items()
-            if tier == SafetyTier.APPROVAL_WRITE
-        ]
-        assert approval_tools == []
+    def test_approval_write_tools(self):
+        for tool in ["mf_wrbl", "mf_restore", "iclass_wrbl", "iso15693_wrbl"]:
+            assert classify_tool(tool) == SafetyTier.APPROVAL_WRITE
 
     def test_unknown_tool_raises(self):
         with pytest.raises(ValueError, match="Unknown tool"):

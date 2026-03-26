@@ -68,10 +68,18 @@ Set `PIDEV_ENGAGEMENTS_DIR` to control where engagement logs are written. Defaul
 | `desfire_files` | read-only | List files in a DESFire application (usually requires auth) |
 | `iclass_info` | read-only | iCLASS / PicoPass tag information (CSN, card type) |
 | `iclass_rdbl` | read-only | Read an iCLASS block (blocks 0-4 usually readable without key) |
+| `iclass_dump` | read-only | Dump iCLASS tag memory to file |
+| `iclass_chk` | read-only | Check iCLASS keys from built-in dictionary |
+| `iclass_loclass` | read-only | Recover iCLASS key via loclass attack |
 | `iso15693_info` | read-only | ISO 15693 tag information (UID, type, manufacturer) |
 | `iso15693_rdbl` | read-only | Read an ISO 15693 block |
+| `iso15693_dump` | read-only | Dump ISO 15693 tag memory to file |
 | `connect` | allowed-write | Validate PM3, create engagement folder |
 | `disconnect` | allowed-write | Finalize command log |
+| `mf_wrbl` | approval-write | Write a MIFARE Classic block (requires confirmation) |
+| `mf_restore` | approval-write | Restore full dump to MIFARE Classic tag (requires confirmation) |
+| `iclass_wrbl` | approval-write | Write an iCLASS block (requires confirmation) |
+| `iso15693_wrbl` | approval-write | Write an ISO 15693 block (requires confirmation) |
 
 ## Safety Model
 
@@ -106,7 +114,7 @@ Proxmark3 (iceman fw) via USB serial
 ## Tests
 
 ```bash
-pytest              # 172 tests, no PM3 hardware needed
+pytest              # no PM3 hardware needed
 pytest -m proxmark3 # integration tests, PM3 must be connected
 ```
 

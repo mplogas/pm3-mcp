@@ -3,7 +3,7 @@
 Tiers:
   read-only       -- full autonomy, no side effects
   allowed-write   -- autonomous, all calls logged
-  approval-write  -- blocks until human confirms (no MVP tools)
+  approval-write  -- blocks until human confirms
 """
 
 from __future__ import annotations
@@ -42,6 +42,10 @@ _TOOL_TIERS: dict[str, SafetyTier] = {
     "iclass_loclass": SafetyTier.READ_ONLY,
     "connect": SafetyTier.ALLOWED_WRITE,
     "disconnect": SafetyTier.ALLOWED_WRITE,
+    "mf_wrbl": SafetyTier.APPROVAL_WRITE,
+    "mf_restore": SafetyTier.APPROVAL_WRITE,
+    "iclass_wrbl": SafetyTier.APPROVAL_WRITE,
+    "iso15693_wrbl": SafetyTier.APPROVAL_WRITE,
 }
 
 

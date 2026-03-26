@@ -656,3 +656,134 @@ async def tool_iclass_loclass(
         return {"error": str(exc)}
 
     return parsers.parse_iclass_loclass(result.get("output", ""))
+
+
+# ---------------------------------------------------------------------------
+# Write operations (approval-write tier)
+# ---------------------------------------------------------------------------
+
+async def tool_mf_wrbl(
+    manager: ConnectionManager,
+    session_id: str,
+    block_num: int,
+    key: str,
+    key_type: str,
+    data: str,
+) -> dict[str, Any]:
+    """Write a MIFARE Classic block. DESTRUCTIVE: overwrites tag data.
+
+    data: 16 bytes as 32 hex chars (no spaces).
+    """
+    key_flag = "-a" if key_type.upper() == "A" else "-b"
+    command = f"hf mf wrbl --blk {block_num} -k {key} {key_flag} -d {data}"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("mf_wrbl failed: %s", exc)
+        return {"error": str(exc)}
+
+    output = result.get("output", "")
+    success = "isok" in output.lower() or "write" in output.lower() and "error" not in output.lower()
+    return {
+        "success": success,
+        "block": block_num,
+        "error": None if success else output.strip(),
+    }
+
+
+async def tool_mf_restore(
+    manager: ConnectionManager,
+    session_id: str,
+    dump_file: str,
+    key_file: str | None = None,
+    tag_size: str = "1k",
+) -> dict[str, Any]:
+    """Restore a full dump to a MIFARE Classic tag. DESTRUCTIVE: overwrites entire tag.
+
+    dump_file: path to the .bin dump file.
+    tag_size: "1k" or "4k".
+    """
+    size_flag = "--1k" if tag_size == "1k" else "--4k"
+    command = f"hf mf restore {size_flag} -f {dump_file}"
+    if key_file:
+        command += f" -k {key_file} --ka"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=120)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("mf_restore failed: %s", exc)
+        return {"error": str(exc)}
+
+    output = result.get("output", "")
+    success = "done" in output.lower() or "restore" in output.lower()
+    return {
+        "success": success,
+        "error": None if success else output.strip(),
+    }
+
+
+async def tool_iclass_wrbl(
+    manager: ConnectionManager,
+    session_id: str,
+    block_num: int,
+    key: str,
+    data: str,
+    credit: bool = False,
+) -> dict[str, Any]:
+    """Write an iCLASS block. DESTRUCTIVE: overwrites tag data.
+
+    data: 8 bytes as 16 hex chars.
+    """
+    command = f"hf iclass wrbl --blk {block_num} -k {key} -d {data}"
+    if credit:
+        command += " --credit"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iclass_wrbl failed: %s", exc)
+        return {"error": str(exc)}
+
+    output = result.get("output", "")
+    success = "ok" in output.lower() or "write" in output.lower() and "error" not in output.lower()
+    return {
+        "success": success,
+        "block": block_num,
+        "error": None if success else output.strip(),
+    }
+
+
+async def tool_iso15693_wrbl(
+    manager: ConnectionManager,
+    session_id: str,
+    block_num: int,
+    data: str,
+) -> dict[str, Any]:
+    """Write an ISO 15693 block. DESTRUCTIVE: overwrites tag data.
+
+    data: 4 bytes as 8 hex chars.
+    """
+    command = f"hf 15 wrbl -b {block_num} -d {data} -*"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=15)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("iso15693_wrbl failed: %s", exc)
+        return {"error": str(exc)}
+
+    output = result.get("output", "")
+    success = "ok" in output.lower() or "write" in output.lower() and "error" not in output.lower()
+    return {
+        "success": success,
+        "block": block_num,
+        "error": None if success else output.strip(),
+    }
