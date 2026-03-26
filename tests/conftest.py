@@ -184,3 +184,190 @@ def dump_fail_output():
 [+] Reading sector access bits...
 [-] Auth error on block 4
 [-] Dump failed"""
+
+
+@pytest.fixture
+def autopwn_all_default_output():
+    """Real output from autopwn on a card with all default keys (4s)."""
+    return """[usb|script] pm3 --> hf mf autopwn -f /tmp/artifacts/dump
+
+[!] Known key failed. Can't authenticate to block   0 key type A
+[!] No known key was supplied, key recovery might fail
+[+] loaded 5 user keys
+[+] loaded 61 hardcoded keys
+[=] Running strategy 1
+[+] Target sector   0 key type A -- found valid key [ FFFFFFFFFFFF ] (used for nested / hardnested attack)
+[+] Target sector   0 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   1 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   1 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   2 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   2 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   3 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   3 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   4 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   4 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   5 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   5 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   6 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   6 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   7 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   7 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   8 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   8 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   9 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   9 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  10 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  10 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  11 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  11 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  12 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  12 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  13 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  13 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  14 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  14 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  15 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  15 key type B -- found valid key [ FFFFFFFFFFFF ]
+
+[+] -----+-----+--------------+---+--------------+----
+[+]  Sec | Blk | key A        |res| key B        |res
+[+] -----+-----+--------------+---+--------------+----
+[+]  000 | 003 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  001 | 007 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  002 | 011 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  003 | 015 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  004 | 019 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  005 | 023 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  006 | 027 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  007 | 031 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  008 | 035 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  009 | 039 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  010 | 043 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  011 | 047 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  012 | 051 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  013 | 055 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  014 | 059 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  015 | 063 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+] -----+-----+--------------+---+--------------+----
+[=] ( D:Dictionary / S:darkSide / U:User / R:Reused / N:Nested / H:Hardnested / C:statiCnested / A:keyA  )
+
+[+] Generating binary key file
+[+] Found keys have been dumped to `/tmp/artifacts/dump-key.bin`
+[=] Transferring keys to simulator memory ( ok )
+[=] Dumping card content to emulator memory (Cmd Error: 04 can occur)
+[=] downloading card content from emulator memory
+[+] Saved 1024 bytes to binary file `/tmp/artifacts/dump.bin`
+[+] Saved to json file /tmp/artifacts/dump.json
+[=] Autopwn execution time: 2 seconds"""
+
+
+@pytest.fixture
+def autopwn_hardnested_output():
+    """Real output from autopwn with hardnested attack on sectors 1/4/5."""
+    return """[usb|script] pm3 --> hf mf autopwn -f /tmp/artifacts/dump
+
+[+] Target sector   0 key type A -- found valid key [ FFFFFFFFFFFF ] (used for nested / hardnested attack)
+[+] Target sector   0 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   2 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   2 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   3 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   3 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   6 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   6 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   7 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   7 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   8 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   8 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   9 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   9 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  10 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  10 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  11 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  11 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  12 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  12 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  13 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  13 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  14 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  14 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  15 key type A -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector  15 key type B -- found valid key [ FFFFFFFFFFFF ]
+[+] Target sector   1 key type A -- found valid key [ 4D57414C5648 ]
+[+] Target sector   4 key type A -- found valid key [ 4D57414C5648 ]
+[+] Target sector   5 key type A -- found valid key [ 4D57414C5648 ]
+[+] Target sector   1 key type B -- found valid key [ 4D48414C5648 ]
+[+] Target sector   4 key type B -- found valid key [ 4D48414C5648 ]
+[+] Target sector   5 key type B -- found valid key [ 4D48414C5648 ]
+
+[+] -----+-----+--------------+---+--------------+----
+[+]  Sec | Blk | key A        |res| key B        |res
+[+] -----+-----+--------------+---+--------------+----
+[+]  000 | 003 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  001 | 007 | 4D57414C5648 | H | 4D48414C5648 | H
+[+]  002 | 011 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  003 | 015 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  004 | 019 | 4D57414C5648 | R | 4D48414C5648 | R
+[+]  005 | 023 | 4D57414C5648 | R | 4D48414C5648 | R
+[+]  006 | 027 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  007 | 031 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  008 | 035 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  009 | 039 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  010 | 043 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  011 | 047 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  012 | 051 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  013 | 055 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  014 | 059 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+]  015 | 063 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+[+] -----+-----+--------------+---+--------------+----
+[=] ( D:Dictionary / S:darkSide / U:User / R:Reused / N:Nested / H:Hardnested / C:statiCnested / A:keyA  )
+
+[+] Generating binary key file
+[+] Found keys have been dumped to `/tmp/artifacts/dump-key.bin`
+[=] Transferring keys to simulator memory ( ok )
+[=] Dumping card content to emulator memory (Cmd Error: 04 can occur)
+[=] downloading card content from emulator memory
+[+] Saved 1024 bytes to binary file `/tmp/artifacts/dump.bin`
+[+] Saved to json file /tmp/artifacts/dump.json
+[=] Autopwn execution time: 73 seconds"""
+
+
+@pytest.fixture
+def darkside_success_output():
+    """Simulated output from successful darkside attack."""
+    return """[usb|script] pm3 --> hf mf darkside
+[=] Darkside attack running...
+[+] Found valid key: A0A1A2A3A4A5"""
+
+
+@pytest.fixture
+def darkside_fail_output():
+    """Simulated output from failed darkside attack (hard PRNG)."""
+    return """[usb|script] pm3 --> hf mf darkside
+[-] Card is not vulnerable to Darkside attack (its PRNG is not predictable)"""
+
+
+@pytest.fixture
+def hardnested_success_output():
+    """Simulated output from successful hardnested attack."""
+    return """[usb|script] pm3 --> hf mf hardnested --blk 3 -a -k FFFFFFFFFFFF --tblk 7 --ta
+[=] ---------+---------+---------------------------------------------------------+-----------------+-------
+[=]        0 |       0 | Start using 4 threads and NEON SIMD core                |                 |
+[=]        0 |       0 | Brute force benchmark: 223 million (2^27.7) keys/s      | 140737488355328 |    7d
+[=]       38 |    2963 | Brute force phase completed.  Key found: 4D57414C5648 |               0 |    0s
+[=] ---------+---------+---------------------------------------------------------+-----------------+-------
+[+] Target sector   1 key type A -- found valid key [ 4D57414C5648 ]"""
+
+
+@pytest.fixture
+def chk_keys_output():
+    """Simulated output from hf mf chk."""
+    return """[usb|script] pm3 --> hf mf chk --1k
+[+] -----+-----+--------------+---+--------------+----
+[+]  Sec | Blk | key A        |res| key B        |res
+[+] -----+-----+--------------+---+--------------+----
+[+]  000 | 003 | FFFFFFFFFFFF | 1 | FFFFFFFFFFFF | 1
+[+]  001 | 007 | ------------ | 0 | ------------ | 0
+[+]  002 | 011 | FFFFFFFFFFFF | 1 | FFFFFFFFFFFF | 1
+[+]  003 | 015 | FFFFFFFFFFFF | 1 | FFFFFFFFFFFF | 1
+[+] -----+-----+--------------+---+--------------+----
+[+] ( 0:Failed / 1:Success )"""

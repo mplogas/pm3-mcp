@@ -13,6 +13,11 @@ from pm3_mcp.parsers import (
     parse_hf_14a_info,
     parse_block_read,
     parse_dump_result,
+    parse_autopwn,
+    parse_darkside,
+    parse_hardnested,
+    parse_chk_keys,
+    sector_to_trailer,
 )
 
 
@@ -286,3 +291,115 @@ class TestParseDumpResult:
         dump_path = str(tmp_path)
         result = parse_dump_result(dump_fail_output, dump_path)
         assert result["success"] is False
+
+
+# ---------------------------------------------------------------------------
+# sector_to_trailer
+# ---------------------------------------------------------------------------
+
+class TestSectorToTrailer:
+    def test_sector_0(self):
+        assert sector_to_trailer(0) == 3
+
+    def test_sector_1(self):
+        assert sector_to_trailer(1) == 7
+
+    def test_sector_15(self):
+        assert sector_to_trailer(15) == 63
+
+    def test_sector_5(self):
+        assert sector_to_trailer(5) == 23
+
+
+# ---------------------------------------------------------------------------
+# parse_autopwn
+# ---------------------------------------------------------------------------
+
+class TestParseAutopwn:
+    def test_all_default_complete(self, autopwn_all_default_output):
+        result = parse_autopwn(autopwn_all_default_output)
+        assert result["complete"] is True
+        assert len(result["keys"]) == 16
+
+    def test_all_default_methods(self, autopwn_all_default_output):
+        result = parse_autopwn(autopwn_all_default_output)
+        for entry in result["keys"]:
+            assert entry["method_a"] == "D"
+            assert entry["method_b"] == "D"
+
+    def test_all_default_key_values(self, autopwn_all_default_output):
+        result = parse_autopwn(autopwn_all_default_output)
+        for entry in result["keys"]:
+            assert entry["key_a"] == "FFFFFFFFFFFF"
+            assert entry["key_b"] == "FFFFFFFFFFFF"
+
+    def test_hardnested_mixed_keys(self, autopwn_hardnested_output):
+        result = parse_autopwn(autopwn_hardnested_output)
+        assert result["complete"] is True
+        # Sector 1 was hardnested
+        s1 = next(k for k in result["keys"] if k["sector"] == 1)
+        assert s1["key_a"] == "4D57414C5648"
+        assert s1["method_a"] == "H"
+
+    def test_execution_time(self, autopwn_all_default_output):
+        result = parse_autopwn(autopwn_all_default_output)
+        assert result["execution_time_s"] == 2
+
+    def test_dump_files(self, autopwn_all_default_output):
+        result = parse_autopwn(autopwn_all_default_output)
+        assert any("dump.bin" in f for f in result["dump_files"])
+        assert any("dump.json" in f for f in result["dump_files"])
+        assert any("key.bin" in f for f in result["dump_files"])
+
+
+# ---------------------------------------------------------------------------
+# parse_darkside
+# ---------------------------------------------------------------------------
+
+class TestParseDarkside:
+    def test_success(self, darkside_success_output):
+        result = parse_darkside(darkside_success_output)
+        assert result["success"] is True
+        assert result["key"] == "A0A1A2A3A4A5"
+
+    def test_failure(self, darkside_fail_output):
+        result = parse_darkside(darkside_fail_output)
+        assert result["success"] is False
+        assert "not vulnerable" in result["error"].lower() or "prng" in result["error"].lower()
+
+
+# ---------------------------------------------------------------------------
+# parse_hardnested
+# ---------------------------------------------------------------------------
+
+class TestParseHardnested:
+    def test_success(self, hardnested_success_output):
+        result = parse_hardnested(hardnested_success_output)
+        assert result["success"] is True
+        assert result["key"] == "4D57414C5648"
+
+    def test_has_target_info(self, hardnested_success_output):
+        result = parse_hardnested(hardnested_success_output)
+        assert result["target_sector"] == 1
+
+
+# ---------------------------------------------------------------------------
+# parse_chk_keys
+# ---------------------------------------------------------------------------
+
+class TestParseChkKeys:
+    def test_found_count(self, chk_keys_output):
+        result = parse_chk_keys(chk_keys_output)
+        assert result["found_count"] == 6  # sectors 0,2,3 have both A+B
+
+    def test_missing_keys(self, chk_keys_output):
+        result = parse_chk_keys(chk_keys_output)
+        s1 = next(k for k in result["keys"] if k["sector"] == 1)
+        assert s1["key_a"] is None
+        assert s1["key_b"] is None
+
+    def test_found_keys(self, chk_keys_output):
+        result = parse_chk_keys(chk_keys_output)
+        s0 = next(k for k in result["keys"] if k["sector"] == 0)
+        assert s0["key_a"] == "FFFFFFFFFFFF"
+        assert s0["key_b"] == "FFFFFFFFFFFF"

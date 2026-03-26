@@ -397,3 +397,204 @@ def parse_dump_result(output: str, dump_path: str) -> dict:
             continue
 
     return result
+
+
+def sector_to_trailer(sector: int) -> int:
+    """Convert a MIFARE Classic sector number to its trailer block number.
+
+    1K sectors 0-15: trailer at (sector * 4 + 3)
+    4K sectors 0-31: same as 1K
+    4K sectors 32-39: 16 blocks each, trailer at (128 + (sector - 32) * 16 + 15)
+    """
+    if sector < 32:
+        return sector * 4 + 3
+    return 128 + (sector - 32) * 16 + 15
+
+
+def parse_autopwn(output: str) -> dict:
+    """Parse output from 'hf mf autopwn'.
+
+    Returns:
+        keys: list of {sector, key_a, key_b, method_a, method_b}
+        dump_files: list of file paths generated
+        execution_time_s: int
+        complete: bool (all sectors recovered)
+        raw: full output
+    """
+    keys = []
+    dump_files = []
+    execution_time_s = 0
+
+    # Parse the key table:
+    # [+]  000 | 003 | FFFFFFFFFFFF | D | FFFFFFFFFFFF | D
+    key_table_re = re.compile(
+        r"\[\+\]\s+(\d+)\s+\|\s+\d+\s+\|\s+([0-9A-Fa-f-]+)\s+\|\s+(\w)\s+\|\s+([0-9A-Fa-f-]+)\s+\|\s+(\w)"
+    )
+    for m in key_table_re.finditer(output):
+        sector = int(m.group(1))
+        key_a = m.group(2) if m.group(2) != "------------" else None
+        method_a = m.group(3)
+        key_b = m.group(4) if m.group(4) != "------------" else None
+        method_b = m.group(5)
+        keys.append({
+            "sector": sector,
+            "key_a": key_a,
+            "key_b": key_b,
+            "method_a": method_a,
+            "method_b": method_b,
+        })
+
+    # Parse dump file paths
+    for m in re.finditer(r"(?:dumped to|Saved.*?to.*?file)\s+`?([^\s`]+)`?", output):
+        dump_files.append(m.group(1))
+
+    # Parse execution time
+    time_match = re.search(r"Autopwn execution time:\s+(\d+)\s+seconds?", output)
+    if time_match:
+        execution_time_s = int(time_match.group(1))
+
+    # Complete if no keys are None
+    complete = len(keys) > 0 and all(
+        k["key_a"] is not None and k["key_b"] is not None for k in keys
+    )
+
+    return {
+        "keys": keys,
+        "dump_files": dump_files,
+        "execution_time_s": execution_time_s,
+        "complete": complete,
+        "raw": output,
+    }
+
+
+def parse_darkside(output: str) -> dict:
+    """Parse output from 'hf mf darkside'.
+
+    Returns:
+        success: bool
+        key: hex string if found
+        error: failure reason if not
+    """
+    # Success: [+] Found valid key: A0A1A2A3A4A5
+    key_match = re.search(r"Found valid key:\s*([0-9A-Fa-f]+)", output)
+    if key_match:
+        return {
+            "success": True,
+            "key": key_match.group(1).upper(),
+            "error": None,
+        }
+
+    # Also check: Key found: XXXX (alternative format from brute force)
+    key_match2 = re.search(r"Key found:\s*([0-9A-Fa-f]+)", output)
+    if key_match2:
+        return {
+            "success": True,
+            "key": key_match2.group(1).upper(),
+            "error": None,
+        }
+
+    # Failure: extract error line
+    error_match = re.search(r"\[-\]\s+(.+)", output)
+    error_msg = error_match.group(1).strip() if error_match else "darkside attack failed"
+    return {
+        "success": False,
+        "key": None,
+        "error": error_msg,
+    }
+
+
+def parse_hardnested(output: str) -> dict:
+    """Parse output from 'hf mf hardnested'.
+
+    Returns:
+        success: bool
+        key: hex string if found
+        target_sector: int (from the "found valid key" line)
+        nonces: int (from the nonce count column)
+        error: failure reason if not
+    """
+    # Success: Key found: 4D57414C5648
+    key_match = re.search(r"Key found:\s*([0-9A-Fa-f]+)", output)
+    # Also: [+] Target sector N key type X -- found valid key [ XXXX ]
+    target_match = re.search(
+        r"Target sector\s+(\d+)\s+key type\s+\w\s+--\s+found valid key\s+\[\s*([0-9A-Fa-f]+)\s*\]",
+        output,
+    )
+
+    key = None
+    target_sector = None
+
+    if key_match:
+        key = key_match.group(1).upper()
+    if target_match:
+        target_sector = int(target_match.group(1))
+        if key is None:
+            key = target_match.group(2).upper()
+
+    if key:
+        # Extract nonce count from last nonces column entry
+        nonce_matches = re.findall(r"\|\s+(\d+)\s+\|", output)
+        nonces = int(nonce_matches[-1]) if nonce_matches else 0
+
+        return {
+            "success": True,
+            "key": key,
+            "target_sector": target_sector,
+            "nonces": nonces,
+            "error": None,
+        }
+
+    error_match = re.search(r"\[-\]\s+(.+)", output)
+    error_msg = error_match.group(1).strip() if error_match else "hardnested attack failed"
+    return {
+        "success": False,
+        "key": None,
+        "target_sector": target_sector,
+        "nonces": 0,
+        "error": error_msg,
+    }
+
+
+def parse_chk_keys(output: str) -> dict:
+    """Parse output from 'hf mf chk'.
+
+    Returns:
+        keys: list of {sector, key_a, key_b} (None if not found)
+        found_count: total keys found
+        total_sectors: sectors checked
+    """
+    keys = []
+    found_count = 0
+
+    # Same table format as autopwn but with 1/0 instead of method codes
+    # [+]  000 | 003 | FFFFFFFFFFFF | 1 | FFFFFFFFFFFF | 1
+    # [+]  001 | 007 | ------------ | 0 | ------------ | 0
+    key_table_re = re.compile(
+        r"\[\+\]\s+(\d+)\s+\|\s+\d+\s+\|\s+([0-9A-Fa-f-]+)\s+\|\s+(\d)\s+\|\s+([0-9A-Fa-f-]+)\s+\|\s+(\d)"
+    )
+    for m in key_table_re.finditer(output):
+        sector = int(m.group(1))
+        key_a_raw = m.group(2)
+        found_a = m.group(3) == "1"
+        key_b_raw = m.group(4)
+        found_b = m.group(5) == "1"
+
+        key_a = key_a_raw if found_a and key_a_raw != "------------" else None
+        key_b = key_b_raw if found_b and key_b_raw != "------------" else None
+
+        if key_a:
+            found_count += 1
+        if key_b:
+            found_count += 1
+
+        keys.append({
+            "sector": sector,
+            "key_a": key_a,
+            "key_b": key_b,
+        })
+
+    return {
+        "keys": keys,
+        "found_count": found_count,
+        "total_sectors": len(keys),
+    }
