@@ -432,3 +432,212 @@ class TestDumpTag:
 
         assert "error" in result
         mgr.run_command.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# TestAutopwn
+# ---------------------------------------------------------------------------
+
+class TestAutopwn:
+    @pytest.mark.asyncio
+    async def test_autopwn_success_complete(self, autopwn_all_default_output, tmp_path):
+        mgr = _make_manager()
+        mgr.get_artifacts_path.return_value = tmp_path / "artifacts"
+        mgr.run_command.return_value = _run_ok(autopwn_all_default_output)
+
+        result = await tools.tool_autopwn(mgr, "abc12345")
+
+        assert result["complete"] is True
+        assert len(result["keys"]) == 16
+
+    @pytest.mark.asyncio
+    async def test_autopwn_uses_artifacts_path(self, autopwn_all_default_output, tmp_path):
+        artifacts = tmp_path / "artifacts"
+        mgr = _make_manager()
+        mgr.get_artifacts_path.return_value = artifacts
+        mgr.run_command.return_value = _run_ok(autopwn_all_default_output)
+
+        await tools.tool_autopwn(mgr, "abc12345")
+
+        cmd = mgr.run_command.call_args[0][1]
+        assert str(artifacts) in cmd
+        assert "dump" in cmd
+
+    @pytest.mark.asyncio
+    async def test_autopwn_timeout_300(self, autopwn_all_default_output, tmp_path):
+        mgr = _make_manager()
+        mgr.get_artifacts_path.return_value = tmp_path / "artifacts"
+        mgr.run_command.return_value = _run_ok(autopwn_all_default_output)
+
+        await tools.tool_autopwn(mgr, "abc12345")
+
+        kwargs = mgr.run_command.call_args[1]
+        assert kwargs.get("timeout") == 300
+
+    @pytest.mark.asyncio
+    async def test_autopwn_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.get_artifacts_path.return_value = None
+
+        result = await tools.tool_autopwn(mgr, "nonexistent")
+
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# TestDarkside
+# ---------------------------------------------------------------------------
+
+class TestDarkside:
+    @pytest.mark.asyncio
+    async def test_darkside_success(self, darkside_success_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(darkside_success_output)
+
+        result = await tools.tool_darkside(mgr, "abc12345")
+
+        assert result["success"] is True
+        assert result["key"] == "A0A1A2A3A4A5"
+
+    @pytest.mark.asyncio
+    async def test_darkside_not_vulnerable(self, darkside_fail_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(darkside_fail_output)
+
+        result = await tools.tool_darkside(mgr, "abc12345")
+
+        assert result["success"] is False
+        assert result["key"] is None
+        assert result["error"]
+
+    @pytest.mark.asyncio
+    async def test_darkside_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.run_command.side_effect = KeyError("abc12345")
+
+        result = await tools.tool_darkside(mgr, "abc12345")
+
+        assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# TestNested
+# ---------------------------------------------------------------------------
+
+class TestNested:
+    @pytest.mark.asyncio
+    async def test_nested_command_construction_key_a(self, hardnested_success_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(hardnested_success_output)
+
+        await tools.tool_nested(mgr, "abc12345", "FFFFFFFFFFFF", "A", 4, "A")
+
+        cmd = mgr.run_command.call_args[0][1]
+        # sector 0 trailer is block 3, sector 4 trailer is block 19
+        assert "--blk 3" in cmd
+        assert "--tblk 19" in cmd
+        assert "-a" in cmd
+        assert "--ta" in cmd
+
+    @pytest.mark.asyncio
+    async def test_nested_command_construction_key_b(self, hardnested_success_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(hardnested_success_output)
+
+        await tools.tool_nested(mgr, "abc12345", "FFFFFFFFFFFF", "A", 4, "B")
+
+        cmd = mgr.run_command.call_args[0][1]
+        assert "--tb" in cmd
+        assert "--ta" not in cmd
+
+    @pytest.mark.asyncio
+    async def test_nested_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.run_command.side_effect = KeyError("abc12345")
+
+        result = await tools.tool_nested(mgr, "abc12345", "FFFFFFFFFFFF", "A", 1, "A")
+
+        assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# TestHardnested
+# ---------------------------------------------------------------------------
+
+class TestHardnested:
+    @pytest.mark.asyncio
+    async def test_hardnested_success(self, hardnested_success_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(hardnested_success_output)
+
+        result = await tools.tool_hardnested(mgr, "abc12345", "FFFFFFFFFFFF", "A", 1, "A")
+
+        assert result["success"] is True
+        assert result["key"] == "4D57414C5648"
+
+    @pytest.mark.asyncio
+    async def test_hardnested_timeout_120(self, hardnested_success_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(hardnested_success_output)
+
+        await tools.tool_hardnested(mgr, "abc12345", "FFFFFFFFFFFF", "A", 1, "A")
+
+        kwargs = mgr.run_command.call_args[1]
+        assert kwargs.get("timeout") == 120
+
+    @pytest.mark.asyncio
+    async def test_hardnested_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.run_command.side_effect = KeyError("abc12345")
+
+        result = await tools.tool_hardnested(mgr, "abc12345", "FFFFFFFFFFFF", "A", 1, "A")
+
+        assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# TestChkKeys
+# ---------------------------------------------------------------------------
+
+class TestChkKeys:
+    @pytest.mark.asyncio
+    async def test_chk_keys_default(self, chk_keys_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(chk_keys_output)
+
+        result = await tools.tool_chk_keys(mgr, "abc12345")
+
+        assert "keys" in result
+        assert "found_count" in result
+        assert "total_sectors" in result
+
+    @pytest.mark.asyncio
+    async def test_chk_keys_custom_key_list(self, chk_keys_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(chk_keys_output)
+
+        await tools.tool_chk_keys(mgr, "abc12345", key_list=["A0A1A2A3A4A5", "B0B1B2B3B4B5"])
+
+        cmd = mgr.run_command.call_args[0][1]
+        assert "-k A0A1A2A3A4A5" in cmd
+        assert "-k B0B1B2B3B4B5" in cmd
+
+    @pytest.mark.asyncio
+    async def test_chk_keys_no_key_list_no_k_flags(self, chk_keys_output):
+        mgr = _make_manager()
+        mgr.run_command.return_value = _run_ok(chk_keys_output)
+
+        await tools.tool_chk_keys(mgr, "abc12345")
+
+        cmd = mgr.run_command.call_args[0][1]
+        assert " -k " not in cmd
+
+    @pytest.mark.asyncio
+    async def test_chk_keys_nonexistent_session(self):
+        mgr = _make_manager()
+        mgr.run_command.side_effect = KeyError("abc12345")
+
+        result = await tools.tool_chk_keys(mgr, "abc12345")
+
+        assert "error" in result

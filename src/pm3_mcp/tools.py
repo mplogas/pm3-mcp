@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from pm3_mcp import parsers
+from pm3_mcp.parsers import sector_to_trailer
 from pm3_mcp.connection import ConnectionManager
 
 log = logging.getLogger(__name__)
@@ -249,3 +250,143 @@ async def tool_dump_tag(
         return {"error": str(exc)}
 
     return parsers.parse_dump_result(result.get("output", ""), dump_path)
+
+
+async def tool_autopwn(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Run 'hf mf autopwn' and dump all sector keys to the engagement artifacts directory.
+
+    Uses a 300-second timeout. Returns parsed autopwn result or {"error": ...}.
+    """
+    artifacts_path = manager.get_artifacts_path(session_id)
+    if artifacts_path is None:
+        return {"error": f"session not found: {session_id}"}
+
+    command = f"hf mf autopwn -f {artifacts_path}/dump"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=300)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("autopwn failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_autopwn(result.get("output", ""))
+
+
+async def tool_darkside(
+    manager: ConnectionManager,
+    session_id: str,
+) -> dict[str, Any]:
+    """Run 'hf mf darkside' to recover a key via the Darkside attack.
+
+    Returns parsed darkside result or {"error": ...}.
+    """
+    try:
+        result = manager.run_command(session_id, "hf mf darkside", timeout=60)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("darkside failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_darkside(result.get("output", ""))
+
+
+async def tool_nested(
+    manager: ConnectionManager,
+    session_id: str,
+    known_key: str,
+    known_key_type: str,
+    target_sector: int,
+    target_key_type: str,
+) -> dict[str, Any]:
+    """Run 'hf mf nested' to recover a key via the Nested attack.
+
+    Uses sector 0 as the known sector. known_key_type and target_key_type
+    must be 'A' or 'B'.
+    Returns parsed result or {"error": ...}.
+    """
+    known_blk = sector_to_trailer(0)
+    known_flag = "-a" if known_key_type.upper() == "A" else "-b"
+    target_blk = sector_to_trailer(target_sector)
+    target_flag = "--ta" if target_key_type.upper() == "A" else "--tb"
+
+    command = (
+        f"hf mf nested --blk {known_blk} {known_flag} -k {known_key} "
+        f"--tblk {target_blk} {target_flag}"
+    )
+
+    try:
+        result = manager.run_command(session_id, command, timeout=60)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("nested failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_hardnested(result.get("output", ""))
+
+
+async def tool_hardnested(
+    manager: ConnectionManager,
+    session_id: str,
+    known_key: str,
+    known_key_type: str,
+    target_sector: int,
+    target_key_type: str,
+) -> dict[str, Any]:
+    """Run 'hf mf hardnested' to recover a key via the Hardnested attack.
+
+    Uses sector 0 as the known sector. known_key_type and target_key_type
+    must be 'A' or 'B'.
+    Returns parsed result or {"error": ...}.
+    """
+    known_blk = sector_to_trailer(0)
+    known_flag = "-a" if known_key_type.upper() == "A" else "-b"
+    target_blk = sector_to_trailer(target_sector)
+    target_flag = "--ta" if target_key_type.upper() == "A" else "--tb"
+
+    command = (
+        f"hf mf hardnested --blk {known_blk} {known_flag} -k {known_key} "
+        f"--tblk {target_blk} {target_flag}"
+    )
+
+    try:
+        result = manager.run_command(session_id, command, timeout=120)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("hardnested failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_hardnested(result.get("output", ""))
+
+
+async def tool_chk_keys(
+    manager: ConnectionManager,
+    session_id: str,
+    key_list: list[str] | None = None,
+) -> dict[str, Any]:
+    """Run 'hf mf chk --1k' to check default and provided keys against all sectors.
+
+    If key_list is provided, appends '-k KEY' for each entry.
+    Returns parsed chk result or {"error": ...}.
+    """
+    command = "hf mf chk --1k"
+    if key_list:
+        for key in key_list:
+            command += f" -k {key}"
+
+    try:
+        result = manager.run_command(session_id, command, timeout=60)
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("chk_keys failed: %s", exc)
+        return {"error": str(exc)}
+
+    return parsers.parse_chk_keys(result.get("output", ""))
