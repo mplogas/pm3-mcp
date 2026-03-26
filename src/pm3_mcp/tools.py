@@ -269,7 +269,7 @@ async def tool_autopwn(
     command = "hf mf autopwn"
 
     try:
-        result = manager.run_command(session_id, command, timeout=300)
+        result = manager.run_command(session_id, command, timeout=600)
     except KeyError:
         return {"error": f"session not found: {session_id}"}
     except Exception as exc:
