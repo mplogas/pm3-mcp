@@ -16,6 +16,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -180,6 +181,49 @@ class ConnectionManager:
         session = self._sessions[session_id]
         port = session["port"]
         result = _run_raw(port, command, timeout=timeout)
+        self._log_command(session_id, command, result)
+        return result
+
+    def run_sniff(
+        self,
+        session_id: str,
+        command: str,
+    ) -> dict[str, Any]:
+        """Run a blocking pm3 sniff command via Popen.
+
+        The pm3 sniff commands block until the user presses the physical
+        button on the Proxmark3 device. This method uses Popen and polls
+        until the process exits on its own.
+
+        Raises KeyError if session_id not found.
+        Returns dict with success, output, returncode.
+        """
+        session = self._sessions[session_id]
+        port = session["port"]
+        artifacts = session["engagement_path"] / "artifacts"
+
+        pm3_bin = _find_pm3()
+        if pm3_bin is None:
+            return {"success": False, "output": "", "returncode": -1, "error": "pm3 not found"}
+
+        # Flush stale trace data before starting the sniff
+        stale_path = str(artifacts / "trace-stale.pm3")
+        _run_raw(port, f"trace save -f {stale_path}", timeout=10)
+
+        cmd = [pm3_bin, "-p", port, "-c", command]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        while proc.poll() is None:
+            time.sleep(0.5)
+
+        raw = proc.stdout.read().decode("utf-8", errors="replace") + proc.stderr.read().decode("utf-8", errors="replace")
+        output = strip_ansi(raw)
+
+        result = {
+            "success": proc.returncode == 0,
+            "output": output,
+            "returncode": proc.returncode,
+        }
         self._log_command(session_id, command, result)
         return result
 

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pm3_mcp.connection import ConnectionManager, _detect_port, _find_pm3, _sanitize_name
+from pm3_mcp.connection import ConnectionManager, _detect_port, _find_pm3, _run_raw, _sanitize_name
 
 
 # ---------------------------------------------------------------------------
@@ -267,3 +267,74 @@ class TestFindPm3:
     @patch("pm3_mcp.connection.shutil.which", return_value=None)
     def test_not_found(self, _which, _is_file):
         assert _find_pm3() is None
+
+
+# ---------------------------------------------------------------------------
+# TestRunSniff
+# ---------------------------------------------------------------------------
+
+class TestRunSniff:
+    """Popen-based sniff command execution."""
+
+    @patch("pm3_mcp.connection._run_raw")
+    @patch("pm3_mcp.connection.subprocess.Popen")
+    @patch("pm3_mcp.connection.subprocess.run", return_value=_hw_status_success())
+    @patch("pm3_mcp.connection.shutil.which", return_value="/usr/bin/pm3")
+    def test_run_sniff_starts_and_completes(self, _which, mock_run, mock_popen, mock_raw, engagements_dir):
+        mgr = ConnectionManager(engagements_dir)
+        sid = mgr.connect("test", port="/dev/ttyACM0")
+
+        proc_mock = MagicMock()
+        proc_mock.poll.side_effect = [None, None, 0]
+        proc_mock.returncode = 0
+        proc_mock.pid = 12345
+        proc_mock.stdout.read.return_value = b"[+] Sniff complete\n"
+        proc_mock.stderr.read.return_value = b""
+        mock_popen.return_value = proc_mock
+
+        mock_raw.return_value = {"success": True, "output": "", "returncode": 0}
+
+        result = mgr.run_sniff(sid, "hf 14a sniff")
+        assert result["success"] is True
+        assert "Sniff complete" in result["output"]
+        assert result["returncode"] == 0
+
+        mock_popen.assert_called_once()
+        cmd = mock_popen.call_args[0][0]
+        assert cmd == ["/usr/bin/pm3", "-p", "/dev/ttyACM0", "-c", "hf 14a sniff"]
+
+    @patch("pm3_mcp.connection.shutil.which", return_value="/usr/bin/pm3")
+    def test_run_sniff_nonexistent_session(self, _which, engagements_dir):
+        mgr = ConnectionManager(engagements_dir)
+        with pytest.raises(KeyError):
+            mgr.run_sniff("nonexistent", "hf 14a sniff")
+
+    @patch("pm3_mcp.connection._run_raw")
+    @patch("pm3_mcp.connection.subprocess.Popen")
+    @patch("pm3_mcp.connection.subprocess.run", return_value=_hw_status_success())
+    @patch("pm3_mcp.connection.shutil.which", return_value="/usr/bin/pm3")
+    def test_run_sniff_flush_stale_trace(self, _which, mock_run, mock_popen, mock_raw, engagements_dir):
+        mgr = ConnectionManager(engagements_dir)
+        sid = mgr.connect("test", port="/dev/ttyACM0")
+
+        # Reset mock_raw call list after connect (connect does not call _run_raw
+        # because we patched subprocess.run directly for hw status)
+        mock_raw.reset_mock()
+
+        proc_mock = MagicMock()
+        proc_mock.poll.return_value = 0
+        proc_mock.returncode = 0
+        proc_mock.pid = 12345
+        proc_mock.stdout.read.return_value = b""
+        proc_mock.stderr.read.return_value = b""
+        mock_popen.return_value = proc_mock
+
+        mock_raw.return_value = {"success": True, "output": "", "returncode": 0}
+
+        mgr.run_sniff(sid, "hf 14a sniff")
+
+        # Verify trace save was called before Popen
+        assert mock_raw.call_count >= 1
+        first_call_args = mock_raw.call_args_list[0]
+        assert "trace save" in first_call_args[0][1]
+        assert mock_popen.called
