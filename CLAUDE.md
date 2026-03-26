@@ -31,7 +31,7 @@ command has its own parser function.
 
 Three tiers enforced at the MCP server boundary:
 
-- **read-only**: full autonomy (hw_status, detect_tag, hf_info, lf_info, read_block, dump_tag, autopwn, darkside, nested, hardnested, chk_keys, desfire_info, desfire_apps, desfire_files)
+- **read-only**: full autonomy (hw_status, detect_tag, hf_info, lf_info, read_block, dump_tag, autopwn, darkside, nested, hardnested, chk_keys, desfire_info, desfire_apps, desfire_files, iclass_info, iclass_rdbl, iso15693_info, iso15693_rdbl)
 - **allowed-write**: autonomous but logged (connect, disconnect)
 - **approval-write**: reserved for future write/clone operations (no MVP tools)
 

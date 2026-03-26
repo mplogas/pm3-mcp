@@ -66,6 +66,10 @@ Set `PIDEV_ENGAGEMENTS_DIR` to control where engagement logs are written. Defaul
 | `desfire_info` | read-only | DESFire tag details: UID, version, storage, apps, signature |
 | `desfire_apps` | read-only | Enumerate DESFire applications and their auth requirements |
 | `desfire_files` | read-only | List files in a DESFire application (usually requires auth) |
+| `iclass_info` | read-only | iCLASS / PicoPass tag information (CSN, card type) |
+| `iclass_rdbl` | read-only | Read an iCLASS block (blocks 0-4 usually readable without key) |
+| `iso15693_info` | read-only | ISO 15693 tag information (UID, type, manufacturer) |
+| `iso15693_rdbl` | read-only | Read an ISO 15693 block |
 | `connect` | allowed-write | Validate PM3, create engagement folder |
 | `disconnect` | allowed-write | Finalize command log |
 
