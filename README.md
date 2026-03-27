@@ -106,6 +106,10 @@ Proxmark3 (iceman fw) via USB serial
 - `parsers.py` handles the text output parsing, separated from tool logic. PM3 output format varies by command and iceman version.
 - Port auto-detection scans `/dev/ttyACM*` when no port is specified.
 
+## Project Integration
+
+The `connect` tool accepts an optional `project_path` parameter. When provided (from project-mcp's `create_project`), engagement data is written to `<project_path>/pm3/` instead of creating a standalone folder. Omit it for standalone use.
+
 ## Known Constraints
 
 - **~1s overhead per command:** each call connects/disconnects at USB level. Acceptable for identification workflows.
