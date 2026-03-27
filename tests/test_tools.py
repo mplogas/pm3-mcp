@@ -47,7 +47,7 @@ class TestConnect:
         assert result["session_id"] == "abc12345"
         assert result["port"] == "/dev/ttyACM0"
         assert "engagement_path" in result
-        mgr.connect.assert_called_once_with("my-tag", port="/dev/ttyACM0")
+        mgr.connect.assert_called_once_with("my-tag", port="/dev/ttyACM0", project_path=None)
 
     @pytest.mark.asyncio
     async def test_connect_returns_none(self):
@@ -73,7 +73,7 @@ class TestConnect:
         result = await tools.tool_connect(mgr, None, "auto-tag")
 
         assert result["session_id"] == "def67890"
-        mgr.connect.assert_called_once_with("auto-tag", port=None)
+        mgr.connect.assert_called_once_with("auto-tag", port=None, project_path=None)
 
     @pytest.mark.asyncio
     async def test_connect_exception_returns_error(self):
