@@ -121,6 +121,9 @@ class ConnectionManager:
             log.error("PM3 not responding on %s", port)
             return None
 
+        sanitized = _sanitize_name(engagement_name)
+        timestamp = datetime.now().strftime("%d-%m-%Y-%H-%M")
+
         if project_path is not None:
             resolved = Path(project_path).resolve()
             if not resolved.is_relative_to(self._engagements_dir.resolve()):
@@ -130,8 +133,6 @@ class ConnectionManager:
             (engagement_path / "logs").mkdir(exist_ok=True)
             (engagement_path / "artifacts").mkdir(exist_ok=True)
         else:
-            sanitized = _sanitize_name(engagement_name)
-            timestamp = datetime.now().strftime("%d-%m-%Y-%H-%M")
             folder_name = f"{timestamp}_PM3_{sanitized}"
             engagement_path = self._engagements_dir / folder_name
             counter = 1
