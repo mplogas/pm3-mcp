@@ -14,6 +14,7 @@ Error handling:
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,59 @@ from pm3_mcp.parsers import sector_to_trailer
 from pm3_mcp.connection import ConnectionManager
 
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Input validation -- prevent command injection via pm3 -c semicolons
+# ---------------------------------------------------------------------------
+
+# Characters that act as command separators or shell metacharacters in pm3 -c
+_DANGEROUS_CHARS = re.compile(r'[;|><&`$]')
+
+
+def _validate_hex(value: str, length: int, name: str) -> None:
+    """Validate a hex string has exact length and contains only hex chars."""
+    if not re.fullmatch(r'[0-9a-fA-F]+', value):
+        raise ValueError(f"{name} must be hex-only, got: {value!r}")
+    if len(value) != length:
+        raise ValueError(f"{name} must be {length} hex chars, got {len(value)}")
+
+
+def _validate_hex_data(value: str, name: str) -> None:
+    """Validate hex data string (even length, hex chars only)."""
+    if not re.fullmatch(r'[0-9a-fA-F]+', value):
+        raise ValueError(f"{name} must be hex-only, got: {value!r}")
+    if len(value) % 2 != 0:
+        raise ValueError(f"{name} must be even length hex, got {len(value)}")
+
+
+def _validate_block(block: int, max_block: int = 255) -> None:
+    """Validate block number is in valid range."""
+    if not isinstance(block, int) or block < 0 or block > max_block:
+        raise ValueError(f"Block must be 0-{max_block}, got: {block}")
+
+
+def _validate_sector(sector: int, max_sector: int = 39) -> None:
+    """Validate sector number is in valid range."""
+    if not isinstance(sector, int) or sector < 0 or sector > max_sector:
+        raise ValueError(f"Sector must be 0-{max_sector}, got: {sector}")
+
+
+def _validate_no_injection(value: str, name: str) -> None:
+    """Reject any value containing command injection characters."""
+    if _DANGEROUS_CHARS.search(value):
+        raise ValueError(f"{name} contains dangerous characters: {value!r}")
+
+
+def _validate_path(value: str, name: str) -> None:
+    """Validate a file path has no injection characters."""
+    _validate_no_injection(value, name)
+
+
+def _validate_key_type(key_type: str) -> None:
+    """Validate MIFARE key type is A or B."""
+    if key_type.upper() not in ("A", "B"):
+        raise ValueError(f"key_type must be A or B, got: {key_type!r}")
+
 
 _VALID_TAG_TYPES = {"mf1k", "mf4k", "mfu"}
 
@@ -195,6 +249,13 @@ async def tool_read_block(
     Runs 'hf mf rdbl --blk N -k KEY -a' (or -b for key type B).
     Returns parsed block data or {"error": ...}.
     """
+    try:
+        _validate_block(block_num)
+        _validate_hex(key, 12, "key")
+        _validate_key_type(key_type)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     key_flag = "-a" if key_type.upper() == "A" else "-b"
     command = f"hf mf rdbl --blk {block_num} -k {key} {key_flag}"
 
@@ -229,9 +290,21 @@ async def tool_dump_tag(
             )
         }
 
+    if key_file is not None:
+        try:
+            _validate_path(key_file, "key_file")
+        except ValueError as exc:
+            return {"error": str(exc)}
+
     artifacts_path = manager.get_artifacts_path(session_id)
     if artifacts_path is None:
         return {"error": f"session not found: {session_id}"}
+
+    if key_file is not None:
+        resolved = Path(key_file).resolve()
+        eng_resolved = artifacts_path.parent.resolve()
+        if not resolved.is_relative_to(eng_resolved):
+            return {"error": f"Path must be under engagement directory: {key_file}"}
 
     dump_path = str(artifacts_path)
     base_command = _DUMP_COMMANDS[tag_type]
@@ -311,6 +384,14 @@ async def tool_nested(
     must be 'A' or 'B'.
     Returns parsed result or {"error": ...}.
     """
+    try:
+        _validate_hex(known_key, 12, "known_key")
+        _validate_key_type(known_key_type)
+        _validate_sector(target_sector)
+        _validate_key_type(target_key_type)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     known_blk = sector_to_trailer(0)
     known_flag = "-a" if known_key_type.upper() == "A" else "-b"
     target_blk = sector_to_trailer(target_sector)
@@ -346,6 +427,14 @@ async def tool_hardnested(
     must be 'A' or 'B'.
     Returns parsed result or {"error": ...}.
     """
+    try:
+        _validate_hex(known_key, 12, "known_key")
+        _validate_key_type(known_key_type)
+        _validate_sector(target_sector)
+        _validate_key_type(target_key_type)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     known_blk = sector_to_trailer(0)
     known_flag = "-a" if known_key_type.upper() == "A" else "-b"
     target_blk = sector_to_trailer(target_sector)
@@ -377,6 +466,13 @@ async def tool_chk_keys(
     If key_list is provided, appends '-k KEY' for each entry.
     Returns parsed chk result or {"error": ...}.
     """
+    if key_list:
+        try:
+            for key in key_list:
+                _validate_hex(key, 12, "key")
+        except ValueError as exc:
+            return {"error": str(exc)}
+
     command = "hf mf chk --1k"
     if key_list:
         for key in key_list:
@@ -442,6 +538,11 @@ async def tool_desfire_files(
     an auth-required error. That itself is a finding (properly secured).
     """
     try:
+        _validate_hex(aid, 6, "aid")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    try:
         result = manager.run_command(
             session_id, f"hf mfdes lsfiles --no-auth --aid {aid}", timeout=15,
         )
@@ -486,6 +587,13 @@ async def tool_iclass_rdbl(
     key: 8-byte hex key. If None, tries without auth (blocks 0-4 are usually readable).
     credit: use credit key instead of debit key.
     """
+    try:
+        _validate_block(block_num)
+        if key:
+            _validate_hex(key, 16, "key")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     command = f"hf iclass rdbl --blk {block_num}"
     if key:
         command += f" -k {key}"
@@ -529,6 +637,11 @@ async def tool_iso15693_rdbl(
     block_num: int,
 ) -> dict[str, Any]:
     """Read an ISO 15693 block."""
+    try:
+        _validate_block(block_num)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     command = f"hf 15 rdbl -b {block_num} -*"
 
     try:
@@ -557,6 +670,14 @@ async def tool_iclass_dump(
     key: 8-byte debit key hex. If None, tries without auth.
     credit_key: 8-byte credit key hex for credit-protected areas.
     """
+    try:
+        if key:
+            _validate_hex(key, 16, "key")
+        if credit_key:
+            _validate_hex(credit_key, 16, "credit_key")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     artifacts_path = manager.get_artifacts_path(session_id)
     if artifacts_path is None:
         return {"error": f"session not found: {session_id}"}
@@ -644,6 +765,20 @@ async def tool_iclass_loclass(
     Requires a trace file from 'hf iclass sim -t 2' (sniffed NR/MAC pairs).
     If trace_file is None, uses the default location.
     """
+    if trace_file:
+        try:
+            _validate_path(trace_file, "trace_file")
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        artifacts_path = manager.get_artifacts_path(session_id)
+        if artifacts_path is None:
+            return {"error": f"session not found: {session_id}"}
+        resolved = Path(trace_file).resolve()
+        eng_resolved = artifacts_path.parent.resolve()
+        if not resolved.is_relative_to(eng_resolved):
+            return {"error": f"Path must be under engagement directory: {trace_file}"}
+
     command = "hf iclass loclass"
     if trace_file:
         command += f" -f {trace_file}"
@@ -675,6 +810,14 @@ async def tool_mf_wrbl(
 
     data: 16 bytes as 32 hex chars (no spaces).
     """
+    try:
+        _validate_block(block_num)
+        _validate_hex(key, 12, "key")
+        _validate_key_type(key_type)
+        _validate_hex(data, 32, "data")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     key_flag = "-a" if key_type.upper() == "A" else "-b"
     command = f"hf mf wrbl --blk {block_num} -k {key} {key_flag} -d {data}"
 
@@ -687,7 +830,7 @@ async def tool_mf_wrbl(
         return {"error": str(exc)}
 
     output = result.get("output", "")
-    success = "isok" in output.lower() or "write" in output.lower() and "error" not in output.lower()
+    success = ("isok" in output.lower() or "write" in output.lower()) and "error" not in output.lower()
     return {
         "success": success,
         "block": block_num,
@@ -707,6 +850,29 @@ async def tool_mf_restore(
     dump_file: path to the .bin dump file.
     tag_size: "1k" or "4k".
     """
+    try:
+        _validate_path(dump_file, "dump_file")
+        if key_file:
+            _validate_path(key_file, "key_file")
+        if tag_size not in ("1k", "4k"):
+            raise ValueError(f"tag_size must be 1k or 4k, got: {tag_size!r}")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    artifacts_path = manager.get_artifacts_path(session_id)
+    if artifacts_path is None:
+        return {"error": f"session not found: {session_id}"}
+    eng_resolved = artifacts_path.parent.resolve()
+
+    resolved_dump = Path(dump_file).resolve()
+    if not resolved_dump.is_relative_to(eng_resolved):
+        return {"error": f"Path must be under engagement directory: {dump_file}"}
+
+    if key_file:
+        resolved_key = Path(key_file).resolve()
+        if not resolved_key.is_relative_to(eng_resolved):
+            return {"error": f"Path must be under engagement directory: {key_file}"}
+
     size_flag = "--1k" if tag_size == "1k" else "--4k"
     command = f"hf mf restore {size_flag} -f {dump_file}"
     if key_file:
@@ -740,6 +906,13 @@ async def tool_iclass_wrbl(
 
     data: 8 bytes as 16 hex chars.
     """
+    try:
+        _validate_block(block_num)
+        _validate_hex(key, 16, "key")
+        _validate_hex(data, 16, "data")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     command = f"hf iclass wrbl --blk {block_num} -k {key} -d {data}"
     if credit:
         command += " --credit"
@@ -753,7 +926,7 @@ async def tool_iclass_wrbl(
         return {"error": str(exc)}
 
     output = result.get("output", "")
-    success = "ok" in output.lower() or "write" in output.lower() and "error" not in output.lower()
+    success = ("ok" in output.lower() or "write" in output.lower()) and "error" not in output.lower()
     return {
         "success": success,
         "block": block_num,
@@ -771,6 +944,12 @@ async def tool_iso15693_wrbl(
 
     data: 4 bytes as 8 hex chars.
     """
+    try:
+        _validate_block(block_num)
+        _validate_hex(data, 8, "data")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
     command = f"hf 15 wrbl -b {block_num} -d {data} -*"
 
     try:
@@ -782,7 +961,7 @@ async def tool_iso15693_wrbl(
         return {"error": str(exc)}
 
     output = result.get("output", "")
-    success = "ok" in output.lower() or "write" in output.lower() and "error" not in output.lower()
+    success = ("ok" in output.lower() or "write" in output.lower()) and "error" not in output.lower()
     return {
         "success": success,
         "block": block_num,
@@ -886,6 +1065,11 @@ async def tool_sniff_stop(
     trace_file = str(artifacts_path / f"trace-{protocol}")
 
     try:
+        _validate_path(trace_file, "trace_file")
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    try:
         manager.run_command(session_id, f"trace save -f {trace_file}")
     except KeyError:
         return {"error": f"session not found: {session_id}"}
@@ -893,11 +1077,20 @@ async def tool_sniff_stop(
         log.error("sniff_stop trace save failed: %s", exc)
         return {"error": str(exc)}
 
-    # Step 3: load and decode the trace
+    # Step 3: load the trace
+    try:
+        manager.run_command(session_id, f"trace load -f {trace_file}")
+    except KeyError:
+        return {"error": f"session not found: {session_id}"}
+    except Exception as exc:
+        log.error("sniff_stop trace load failed: %s", exc)
+        return {"error": str(exc)}
+
+    # Step 4: decode the trace with protocol-specific flag
     proto_flag = _TRACE_LIST_FLAGS[protocol]
     try:
         list_result = manager.run_command(
-            session_id, f"trace load -f {trace_file}; trace list -t {proto_flag}"
+            session_id, f"trace list -t {proto_flag}"
         )
     except KeyError:
         return {"error": f"session not found: {session_id}"}

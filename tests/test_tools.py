@@ -420,10 +420,11 @@ class TestDumpTag:
         mgr.get_artifacts_path.return_value = tmp_path / "artifacts"
         mgr.run_command.return_value = _run_ok(dump_success_output)
 
-        await tools.tool_dump_tag(mgr, "abc12345", "mf1k", key_file="/tmp/keys.dic")
+        key_path = str(tmp_path / "keys.dic")
+        await tools.tool_dump_tag(mgr, "abc12345", "mf1k", key_file=key_path)
 
         cmd = mgr.run_command.call_args[0][1]
-        assert "-f /tmp/keys.dic" in cmd
+        assert f"-f {key_path}" in cmd
 
     @pytest.mark.asyncio
     async def test_dump_nonexistent_session(self):
@@ -718,7 +719,8 @@ class TestSniffStop:
         mgr.run_command.side_effect = [
             _run_ok(hw_status_with_trace_output),   # hw status
             _run_ok(""),                             # trace save
-            _run_ok(trace_list_iso15693_output),    # trace load + list
+            _run_ok(""),                             # trace load
+            _run_ok(trace_list_iso15693_output),    # trace list
         ]
 
         result = await tools.tool_sniff_stop(mgr, "abc12345", "15693")
@@ -730,6 +732,14 @@ class TestSniffStop:
         assert isinstance(result["exchange_count"], int)
         assert result["exchange_count"] == len(result["exchanges"])
         assert isinstance(result["auth_nonces"], list)
+        # Verify trace load and trace list are separate commands (no semicolons)
+        assert mgr.run_command.call_count == 4
+        cmds = [call[0][1] for call in mgr.run_command.call_args_list]
+        assert cmds[1] == "trace save -f /tmp/artifacts/trace-15693"
+        assert cmds[2] == "trace load -f /tmp/artifacts/trace-15693"
+        assert cmds[3] == "trace list -t 15"
+        for cmd in cmds:
+            assert ";" not in cmd
 
     @pytest.mark.asyncio
     async def test_sniff_stop_empty_trace(self, hw_status_no_trace_output):
@@ -752,3 +762,311 @@ class TestSniffStop:
 
         assert "error" in result
         assert "abc12345" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# TestInputValidation -- validator functions
+# ---------------------------------------------------------------------------
+
+from pm3_mcp.tools import (
+    _validate_hex,
+    _validate_hex_data,
+    _validate_block,
+    _validate_sector,
+    _validate_no_injection,
+    _validate_path,
+    _validate_key_type,
+)
+
+
+class TestInputValidation:
+    def test_hex_key_valid(self):
+        _validate_hex("FFFFFFFFFFFF", 12, "key")  # should not raise
+
+    def test_hex_key_lowercase_valid(self):
+        _validate_hex("aabbccddeeff", 12, "key")  # should not raise
+
+    def test_hex_key_with_semicolon(self):
+        with pytest.raises(ValueError, match="hex-only"):
+            _validate_hex("FFFFFF;hf mf", 12, "key")
+
+    def test_hex_key_wrong_length(self):
+        with pytest.raises(ValueError, match="12 hex chars"):
+            _validate_hex("FFFF", 12, "key")
+
+    def test_hex_key_with_spaces(self):
+        with pytest.raises(ValueError, match="hex-only"):
+            _validate_hex("FF FF FF FF FF FF", 12, "key")
+
+    def test_hex_16_valid(self):
+        _validate_hex("AE A2 A6 A8 F5 43 21 00".replace(" ", ""), 16, "key")
+
+    def test_block_valid_zero(self):
+        _validate_block(0)
+
+    def test_block_valid_max(self):
+        _validate_block(255)
+
+    def test_block_negative(self):
+        with pytest.raises(ValueError, match="Block"):
+            _validate_block(-1)
+
+    def test_block_overflow(self):
+        with pytest.raises(ValueError, match="Block"):
+            _validate_block(256)
+
+    def test_block_float_rejected(self):
+        with pytest.raises(ValueError, match="Block"):
+            _validate_block(1.5)
+
+    def test_sector_valid(self):
+        _validate_sector(0)
+        _validate_sector(39)
+
+    def test_sector_negative(self):
+        with pytest.raises(ValueError, match="Sector"):
+            _validate_sector(-1)
+
+    def test_sector_overflow(self):
+        with pytest.raises(ValueError, match="Sector"):
+            _validate_sector(40)
+
+    def test_no_injection_semicolon(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_no_injection("FFFFFFFFFFFF; hw reset", "key")
+
+    def test_no_injection_pipe(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_no_injection("test | rm -rf", "param")
+
+    def test_no_injection_backtick(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_no_injection("key`whoami`", "param")
+
+    def test_no_injection_dollar(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_no_injection("$HOME/file", "param")
+
+    def test_no_injection_redirect(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_no_injection("file > /dev/null", "param")
+
+    def test_no_injection_ampersand(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_no_injection("cmd & bg", "param")
+
+    def test_no_injection_clean_string(self):
+        _validate_no_injection("FFFFFFFFFFFF", "key")  # should not raise
+
+    def test_path_safe(self):
+        _validate_path("/tmp/dump.bin", "path")  # should not raise
+
+    def test_path_with_dashes_and_dots(self):
+        _validate_path("/tmp/engagements/my-tag/artifacts/trace-14a.bin", "path")
+
+    def test_path_injection(self):
+        with pytest.raises(ValueError, match="dangerous"):
+            _validate_path("/tmp/dump.bin; rm -rf /", "path")
+
+    def test_hex_data_valid(self):
+        _validate_hex_data("00112233", "data")  # should not raise
+
+    def test_hex_data_odd_length(self):
+        with pytest.raises(ValueError, match="even length"):
+            _validate_hex_data("001", "data")
+
+    def test_hex_data_non_hex(self):
+        with pytest.raises(ValueError, match="hex-only"):
+            _validate_hex_data("GGHHII", "data")
+
+    def test_key_type_valid(self):
+        _validate_key_type("A")
+        _validate_key_type("B")
+        _validate_key_type("a")
+        _validate_key_type("b")
+
+    def test_key_type_invalid(self):
+        with pytest.raises(ValueError, match="key_type"):
+            _validate_key_type("C")
+
+
+# ---------------------------------------------------------------------------
+# TestCommandInjectionPrevention -- end-to-end tool rejection
+# ---------------------------------------------------------------------------
+
+class TestCommandInjectionPrevention:
+    """Verify that tool functions reject parameters containing injection payloads.
+
+    Each test confirms that a semicolon (or other dangerous char) in a
+    user-supplied parameter returns an error dict instead of building a
+    command string.
+    """
+
+    @pytest.mark.asyncio
+    async def test_read_block_rejects_semicolon_key(self):
+        mgr = _make_manager()
+        result = await tools.tool_read_block(
+            mgr, "sess", 0, key="FFFFFF;hw reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_read_block_rejects_bad_key_type(self):
+        mgr = _make_manager()
+        result = await tools.tool_read_block(
+            mgr, "sess", 0, key="FFFFFFFFFFFF", key_type="C"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_read_block_rejects_negative_block(self):
+        mgr = _make_manager()
+        result = await tools.tool_read_block(mgr, "sess", -1)
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mf_wrbl_rejects_injection_data(self):
+        mgr = _make_manager()
+        result = await tools.tool_mf_wrbl(
+            mgr, "sess", 0, "FFFFFFFFFFFF", "A", "00;hw reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mf_wrbl_rejects_short_data(self):
+        mgr = _make_manager()
+        result = await tools.tool_mf_wrbl(
+            mgr, "sess", 0, "FFFFFFFFFFFF", "A", "00FF"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mf_wrbl_rejects_injection_key(self):
+        mgr = _make_manager()
+        result = await tools.tool_mf_wrbl(
+            mgr, "sess", 0,
+            "FFFFFFFFFFFF; hf mf wrbl --blk 3 -k FFFFFFFFFFFF -a -d 00000000000000FF078069FFFFFFFFFFFF",
+            "A", "00112233445566778899AABBCCDDEEFF",
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_nested_rejects_injection_key(self):
+        mgr = _make_manager()
+        result = await tools.tool_nested(
+            mgr, "sess", "FFFFFF;reset", "A", 1, "A"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_hardnested_rejects_injection_key(self):
+        mgr = _make_manager()
+        result = await tools.tool_hardnested(
+            mgr, "sess", "FFFFFF|reset", "A", 1, "A"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_chk_keys_rejects_injection_in_list(self):
+        mgr = _make_manager()
+        result = await tools.tool_chk_keys(
+            mgr, "sess", key_list=["FFFFFFFFFFFF", "AABBCC;reset"]
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dump_tag_rejects_injection_key_file(self):
+        mgr = _make_manager()
+        result = await tools.tool_dump_tag(
+            mgr, "sess", "mf1k", key_file="/tmp/keys.dic; rm -rf /"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_desfire_files_rejects_injection_aid(self):
+        mgr = _make_manager()
+        result = await tools.tool_desfire_files(
+            mgr, "sess", "000357; hw reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iclass_rdbl_rejects_injection_key(self):
+        mgr = _make_manager()
+        result = await tools.tool_iclass_rdbl(
+            mgr, "sess", 5, key="AE A2A6A8;reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iclass_wrbl_rejects_injection_data(self):
+        mgr = _make_manager()
+        result = await tools.tool_iclass_wrbl(
+            mgr, "sess", 7, "AEA2A6A8F5432100", "0011;reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iso15693_wrbl_rejects_injection_data(self):
+        mgr = _make_manager()
+        result = await tools.tool_iso15693_wrbl(
+            mgr, "sess", 0, "AABB;reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mf_restore_rejects_injection_dump_file(self):
+        mgr = _make_manager()
+        result = await tools.tool_mf_restore(
+            mgr, "sess", "/tmp/dump.bin; rm -rf /"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mf_restore_rejects_injection_key_file(self):
+        mgr = _make_manager()
+        result = await tools.tool_mf_restore(
+            mgr, "sess", "/tmp/dump.bin", key_file="/tmp/keys; rm -rf /"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iclass_dump_rejects_injection_key(self):
+        mgr = _make_manager()
+        result = await tools.tool_iclass_dump(
+            mgr, "sess", key="AABBCCDD;reset"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iclass_loclass_rejects_injection_trace_file(self):
+        mgr = _make_manager()
+        result = await tools.tool_iclass_loclass(
+            mgr, "sess", trace_file="/tmp/trace; rm -rf /"
+        )
+        assert "error" in result
+        mgr.run_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iso15693_rdbl_rejects_negative_block(self):
+        mgr = _make_manager()
+        result = await tools.tool_iso15693_rdbl(mgr, "sess", -1)
+        assert "error" in result
+        mgr.run_command.assert_not_called()
