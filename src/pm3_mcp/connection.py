@@ -194,19 +194,27 @@ class ConnectionManager:
         self._log_command(session_id, command, result)
         return result
 
+    # Hard cap on sniff duration. The user presses the PM3 button to stop,
+    # but if they wander off or forget, the poll loop would never exit.
+    # 600s is long enough for any realistic handshake capture.
+    SNIFF_MAX_SECONDS = 600
+
     def run_sniff(
         self,
         session_id: str,
         command: str,
+        timeout: int | None = None,
     ) -> dict[str, Any]:
         """Run a blocking pm3 sniff command via Popen.
 
         The pm3 sniff commands block until the user presses the physical
         button on the Proxmark3 device. This method uses Popen and polls
-        until the process exits on its own.
+        until the process exits on its own OR until timeout elapses (default
+        SNIFF_MAX_SECONDS = 600s), whichever comes first.
 
         Raises KeyError if session_id not found.
-        Returns dict with success, output, returncode.
+        Returns dict with success, output, returncode. On timeout, returncode
+        is -1 and an "error" field is set.
         """
         session = self._sessions[session_id]
         port = session["port"]
@@ -223,17 +231,34 @@ class ConnectionManager:
         cmd = [pm3_bin, "-p", port, "-c", command]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
+        max_seconds = timeout if timeout is not None else self.SNIFF_MAX_SECONDS
+        deadline = time.monotonic() + max_seconds
+        timed_out = False
         while proc.poll() is None:
+            if time.monotonic() >= deadline:
+                timed_out = True
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
+                break
             time.sleep(0.5)
 
         raw = proc.stdout.read().decode("utf-8", errors="replace") + proc.stderr.read().decode("utf-8", errors="replace")
         output = strip_ansi(raw)
 
-        result = {
-            "success": proc.returncode == 0,
+        result: dict[str, Any] = {
+            "success": proc.returncode == 0 and not timed_out,
             "output": output,
-            "returncode": proc.returncode,
+            "returncode": proc.returncode if proc.returncode is not None else -1,
         }
+        if timed_out:
+            result["error"] = (
+                f"sniff timed out after {max_seconds}s. "
+                "Press the PM3 button to stop the sniff, then call sniff_stop."
+            )
         self._log_command(session_id, command, result)
         return result
 

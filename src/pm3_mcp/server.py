@@ -605,9 +605,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     tier = classify_tool(name)
     logger.info("tool=%s tier=%s args=%s", name, tier.value, arguments)
 
-    # No approval-write tools in MVP, but keep the gate for future use.
     if tier == SafetyTier.APPROVAL_WRITE:
-        if not arguments.get("_confirmed", False):
+        # Strict: _confirmed must be literal boolean True. Reject truthy
+        # values like 1, "true", "yes" to avoid accidental write confirmation.
+        if arguments.get("_confirmed") is not True:
             desc = f"{name}({', '.join(f'{k}={v}' for k, v in arguments.items())})"
             return [TextContent(
                 type="text",
@@ -616,7 +617,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     "tool": name,
                     "arguments": arguments,
                     "message": f"APPROVAL REQUIRED: {desc}. "
-                    f"Re-call with _confirmed=true to execute.",
+                    f"Re-call with _confirmed=true (boolean) to execute.",
                 }),
             )]
         arguments = {k: v for k, v in arguments.items() if k != "_confirmed"}

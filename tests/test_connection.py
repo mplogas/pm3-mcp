@@ -313,6 +313,40 @@ class TestRunSniff:
     @patch("pm3_mcp.connection.subprocess.Popen")
     @patch("pm3_mcp.connection.subprocess.run", return_value=_hw_status_success())
     @patch("pm3_mcp.connection.shutil.which", return_value="/usr/bin/pm3")
+    def test_run_sniff_terminates_on_timeout(
+        self, _which, _mock_run, mock_popen, mock_raw, engagements_dir,
+    ):
+        """If the user never presses the PM3 button, the sniff must time out
+        and terminate the subprocess rather than polling forever."""
+        mgr = ConnectionManager(engagements_dir)
+        sid = mgr.connect("test", port="/dev/ttyACM0")
+
+        proc_mock = MagicMock()
+        proc_mock.poll.return_value = None  # never exits on its own
+        proc_mock.returncode = None
+        proc_mock.pid = 12345
+        proc_mock.stdout.read.return_value = b""
+        proc_mock.stderr.read.return_value = b""
+        # Make proc.wait(timeout=5) return a return code (simulate clean terminate)
+        proc_mock.wait.return_value = 0
+
+        def _on_terminate():
+            proc_mock.returncode = -15  # SIGTERM
+
+        proc_mock.terminate.side_effect = _on_terminate
+        mock_popen.return_value = proc_mock
+        mock_raw.return_value = {"success": True, "output": "", "returncode": 0}
+
+        result = mgr.run_sniff(sid, "hf 14a sniff", timeout=1)
+
+        proc_mock.terminate.assert_called_once()
+        assert result["success"] is False
+        assert "timed out" in result.get("error", "")
+
+    @patch("pm3_mcp.connection._run_raw")
+    @patch("pm3_mcp.connection.subprocess.Popen")
+    @patch("pm3_mcp.connection.subprocess.run", return_value=_hw_status_success())
+    @patch("pm3_mcp.connection.shutil.which", return_value="/usr/bin/pm3")
     def test_run_sniff_flush_stale_trace(self, _which, mock_run, mock_popen, mock_raw, engagements_dir):
         mgr = ConnectionManager(engagements_dir)
         sid = mgr.connect("test", port="/dev/ttyACM0")
