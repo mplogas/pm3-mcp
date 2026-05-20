@@ -311,7 +311,7 @@ async def tool_dump_tag(
 
     command = base_command
     if key_file is not None:
-        command = f"{command} -f {key_file}"
+        command = f"{command} -k {key_file}"
 
     try:
         result = manager.run_command(session_id, command, timeout=120)

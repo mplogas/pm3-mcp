@@ -424,7 +424,7 @@ class TestDumpTag:
         await tools.tool_dump_tag(mgr, "abc12345", "mf1k", key_file=key_path)
 
         cmd = mgr.run_command.call_args[0][1]
-        assert f"-f {key_path}" in cmd
+        assert f"-k {key_path}" in cmd
 
     @pytest.mark.asyncio
     async def test_dump_nonexistent_session(self):
