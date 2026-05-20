@@ -522,10 +522,22 @@ def parse_block_read(output: str) -> dict:
 def parse_dump_result(output: str, dump_path: str) -> dict:
     """Parse output from 'pm3 -c hf mf dump'.
 
+    Matches iceman's actual output format. Two iceman variants supported:
+
+        [+] Saved 1024 bytes to binary file `/path/to/hf-mf-UID-dump.bin`
+        [+] Saved to json file /path/to/hf-mf-UID-dump.json
+        [+] Succeeded in dumping all blocks
+
+    And the older format:
+
+        [=] Saved to binary file hf-mf-UID-dump.bin
+        [=] Saved to json file hf-mf-UID-dump.json
+        [+] Dumped 64 blocks (1024 bytes)
+
     Returns:
         success: bool
         dump_path: str -- the dump_path argument passed in
-        output_file: str or None -- filename saved
+        output_file: str or None -- filename saved (prefers .bin over .json)
         raw: str
     """
     result: dict = {
@@ -535,25 +547,41 @@ def parse_dump_result(output: str, dump_path: str) -> dict:
         "raw": output,
     }
 
+    # Saved-binary line. iceman wraps the filename in backticks and prefixes
+    # with a byte count; the older format does neither. Handle both.
+    save_binary_re = re.compile(
+        r"\[[=+]\]\s+Saved(?:\s+\d+\s+bytes)?\s+to\s+binary\s+file\s+`?([^`\n]+?)`?\s*$"
+    )
+    save_json_re = re.compile(
+        r"\[[=+]\]\s+Saved(?:\s+\d+\s+bytes)?\s+to\s+json\s+file\s+`?([^`\n]+?)`?\s*$"
+    )
+    # Success indicators. Current iceman: "Succeeded in dumping all blocks".
+    # Older format: "Dumped N blocks (M bytes)".
+    success_re = re.compile(
+        r"\[\+\]\s+(?:Succeeded\s+in\s+dumping\s+all\s+blocks|Dumped\s+\d+\s+blocks)"
+    )
+    fail_re = re.compile(r"\[-\]\s+Dump\s+failed", re.IGNORECASE)
+
     for line in output.splitlines():
         stripped = line.strip()
 
-        # Saved file line: "[=] Saved to binary file hf-mf-04A3B2C1-dump.bin"
-        m = re.search(r"\[=\]\s+Saved to (?:binary|json) file\s+(\S+)", stripped)
+        m = save_binary_re.search(stripped)
         if m:
-            # Prefer binary (.bin) file as the canonical output
-            fname = m.group(1).strip()
-            if result["output_file"] is None or fname.endswith(".bin"):
-                result["output_file"] = fname
+            result["output_file"] = m.group(1).strip()
             continue
 
-        # Success: "[+] Dumped N blocks (M bytes)"
-        if re.search(r"\[\+\]\s+Dumped\s+\d+\s+blocks", stripped):
+        m = save_json_re.search(stripped)
+        if m:
+            # Only set if we haven't seen a .bin save yet; prefer binary.
+            if result["output_file"] is None:
+                result["output_file"] = m.group(1).strip()
+            continue
+
+        if success_re.search(stripped):
             result["success"] = True
             continue
 
-        # Explicit failure
-        if re.search(r"\[-\]\s+Dump failed", stripped, re.IGNORECASE):
+        if fail_re.search(stripped):
             result["success"] = False
             continue
 

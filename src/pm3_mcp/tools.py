@@ -314,7 +314,9 @@ async def tool_dump_tag(
         command = f"{command} -k {key_file}"
 
     try:
-        result = manager.run_command(session_id, command, timeout=120)
+        # cwd=artifacts_path so pm3's default output naming (hf-mf-<UID>-dump.bin
+        # / .json) lands in the session's artifacts directory instead of $HOME.
+        result = manager.run_command(session_id, command, timeout=120, cwd=artifacts_path)
     except KeyError:
         return {"error": f"session not found: {session_id}"}
     except Exception as exc:

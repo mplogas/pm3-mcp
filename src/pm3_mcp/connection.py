@@ -57,8 +57,14 @@ def _detect_port() -> str | None:
     return None
 
 
-def _run_raw(port: str, command: str, timeout: int = 30) -> dict[str, Any]:
-    """Run a single pm3 command via subprocess. Returns result dict."""
+def _run_raw(port: str, command: str, timeout: int = 30, cwd: Path | str | None = None) -> dict[str, Any]:
+    """Run a single pm3 command via subprocess. Returns result dict.
+
+    cwd controls the working directory the pm3 binary inherits. pm3
+    writes output files (dump.bin, dump.json, keyfile, trace) relative
+    to its cwd unless an absolute -f path is supplied. Pass the
+    artifacts/ directory here when running a file-producing command.
+    """
     pm3_bin = _find_pm3()
     if pm3_bin is None:
         return {"success": False, "output": "", "returncode": -1, "error": "pm3 not found"}
@@ -69,6 +75,7 @@ def _run_raw(port: str, command: str, timeout: int = 30) -> dict[str, Any]:
             cmd,
             capture_output=True,
             timeout=timeout,
+            cwd=str(cwd) if cwd is not None else None,
         )
         # PM3 output can contain non-UTF8 bytes in the ascii column of hex dumps.
         # Decode with replace to avoid crashing on those.
@@ -182,15 +189,18 @@ class ConnectionManager:
         session_id: str,
         command: str,
         timeout: int = 30,
+        cwd: Path | str | None = None,
     ) -> dict[str, Any]:
         """Run a pm3 command within a session.
 
         Raises KeyError if session_id not found.
         Returns dict with success, output, returncode (or error on timeout).
+        cwd controls the pm3 process working directory; pass the session's
+        artifacts/ path for commands that produce files.
         """
         session = self._sessions[session_id]
         port = session["port"]
-        result = _run_raw(port, command, timeout=timeout)
+        result = _run_raw(port, command, timeout=timeout, cwd=cwd)
         self._log_command(session_id, command, result)
         return result
 

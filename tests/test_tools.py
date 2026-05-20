@@ -427,6 +427,24 @@ class TestDumpTag:
         assert f"-k {key_path}" in cmd
 
     @pytest.mark.asyncio
+    async def test_dump_runs_pm3_in_artifacts_cwd(self, dump_success_output, tmp_path):
+        """pm3 writes output files relative to its cwd unless an absolute -f
+        path is given. dump_tag must set cwd=artifacts so the dump lands in
+        the session's artifacts/ directory instead of $HOME.
+        """
+        mgr = _make_manager()
+        artifacts = tmp_path / "artifacts"
+        mgr.get_artifacts_path.return_value = artifacts
+        mgr.run_command.return_value = _run_ok(dump_success_output)
+
+        await tools.tool_dump_tag(mgr, "abc12345", "mf1k")
+
+        kwargs = mgr.run_command.call_args.kwargs
+        assert kwargs.get("cwd") == artifacts, (
+            f"Expected cwd=artifacts ({artifacts}); got {kwargs.get('cwd')!r}"
+        )
+
+    @pytest.mark.asyncio
     async def test_dump_nonexistent_session(self):
         mgr = _make_manager()
         mgr.get_artifacts_path.return_value = None

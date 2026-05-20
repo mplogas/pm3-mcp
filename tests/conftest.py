@@ -168,13 +168,24 @@ Tag Type: EM410x"""
 
 @pytest.fixture
 def dump_success_output():
-    """Simulated output from a successful 'pm3 -c hf mf dump'."""
-    return """[usb|script] pm3 --> hf mf dump
-[+] Reading sector access bits...
-[+] Generating binary file
-[=] Saved to json file hf-mf-04A3B2C1-dump.json
-[=] Saved to binary file hf-mf-04A3B2C1-dump.bin
-[+] Dumped 64 blocks (1024 bytes)"""
+    """Real iceman output from 'pm3 -c hf mf dump -k <keyfile>' (sanitized paths).
+
+    Captured from a live engagement against a MIFARE Classic 1K. The per-sector
+    progress lines (carriage-return overwrites) are omitted; they don't affect
+    parsing.
+    """
+    return """[usb|script] pm3 --> hf mf dump -k hf-mf-04A3B2C1-key.bin
+[+] Loaded binary key file `hf-mf-04A3B2C1-key.bin`
+[=] Reading sector access bits...
+[=] .................
+[+] Finished reading sector access bits
+[=] Dumping all blocks from card...
+[+] Succeeded in dumping all blocks
+
+[+] time: 9 seconds
+
+[+] Saved 1024 bytes to binary file `/tmp/artifacts/hf-mf-04A3B2C1-dump.bin`
+[+] Saved to json file /tmp/artifacts/hf-mf-04A3B2C1-dump.json"""
 
 
 @pytest.fixture
