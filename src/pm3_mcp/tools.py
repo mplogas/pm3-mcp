@@ -309,13 +309,19 @@ async def tool_dump_tag(
     dump_path = str(artifacts_path)
     base_command = _DUMP_COMMANDS[tag_type]
 
-    command = base_command
+    # iceman pm3 reads ~/.proxmark3/preferences.json at startup and uses
+    # file.default.savepath / .dumppath (default $HOME) for output, IGNORING
+    # the process cwd. Pass -f <absolute-path-prefix> to force output into
+    # the engagement sandbox. Filename convention is <tag_type>-dump.{bin,json}
+    # so we don't need to know the UID at this layer.
+    output_prefix = artifacts_path / f"{tag_type}-dump"
+    command = f"{base_command} -f {output_prefix}"
     if key_file is not None:
         command = f"{command} -k {key_file}"
 
     try:
-        # cwd=artifacts_path so pm3's default output naming (hf-mf-<UID>-dump.bin
-        # / .json) lands in the session's artifacts directory instead of $HOME.
+        # cwd is kept as defence-in-depth for the rare iceman build that
+        # honors process cwd over the prefs file.
         result = manager.run_command(session_id, command, timeout=120, cwd=artifacts_path)
     except KeyError:
         return {"error": f"session not found: {session_id}"}

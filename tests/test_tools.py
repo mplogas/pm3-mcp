@@ -445,6 +445,26 @@ class TestDumpTag:
         )
 
     @pytest.mark.asyncio
+    async def test_dump_passes_absolute_output_prefix(self, dump_success_output, tmp_path):
+        """iceman pm3 honors ~/.proxmark3/preferences.json (savepath/dumppath
+        default $HOME) over the process cwd. dump_tag must pass an absolute
+        -f path to override the prefs file and force output into the
+        engagement artifacts directory.
+        """
+        mgr = _make_manager()
+        artifacts = tmp_path / "artifacts"
+        mgr.get_artifacts_path.return_value = artifacts
+        mgr.run_command.return_value = _run_ok(dump_success_output)
+
+        await tools.tool_dump_tag(mgr, "abc12345", "mf1k")
+
+        cmd = mgr.run_command.call_args[0][1]
+        expected_prefix = str(artifacts / "mf1k-dump")
+        assert f"-f {expected_prefix}" in cmd, (
+            f"Expected '-f {expected_prefix}' in command; got: {cmd!r}"
+        )
+
+    @pytest.mark.asyncio
     async def test_dump_nonexistent_session(self):
         mgr = _make_manager()
         mgr.get_artifacts_path.return_value = None
