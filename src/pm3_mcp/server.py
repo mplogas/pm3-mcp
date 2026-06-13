@@ -33,12 +33,19 @@ app = Server("pm3-mcp")
 connection_manager = ConnectionManager(engagements_dir=ENGAGEMENTS_DIR)
 
 
+# Duration class convention (consistent across pidev-sec tool MCPs):
+#   instant    -- <1 s wall clock, foregroundable always
+#   fast       -- 1-10 s, foregroundable
+#   slow       -- 10 s-2 min, background-dispatch recommended
+#   very-slow  -- >2 min, background-dispatch effectively required
+
 TOOL_DEFINITIONS = [
     Tool(
         name="connect",
         description=(
             "Connect to a Proxmark3 device and create an engagement folder. "
-            "Returns a session_id for subsequent calls. [allowed-write]"
+            "Returns a session_id for subsequent calls. "
+            "[allowed-write] [Duration: fast (~1-2 s -- single pm3 handshake).]"
         ),
         inputSchema={
             "type": "object",
@@ -62,7 +69,7 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="disconnect",
-        description="Disconnect a PM3 session by session ID. [allowed-write]",
+        description="Disconnect a PM3 session by session ID. [allowed-write] [Duration: instant.]",
         inputSchema={
             "type": "object",
             "properties": {
@@ -77,7 +84,8 @@ TOOL_DEFINITIONS = [
     Tool(
         name="hw_status",
         description=(
-            "Run 'hw status' and return parsed PM3 device information. [read-only]"
+            "Run 'hw status' and return parsed PM3 device information. "
+            "[read-only] [Duration: fast (~1-2 s -- single pm3 command round-trip).]"
         ),
         inputSchema={
             "type": "object",
@@ -94,7 +102,8 @@ TOOL_DEFINITIONS = [
         name="detect_tag",
         description=(
             "Run 'auto' to detect any nearby RFID/NFC tag. "
-            "Returns raw PM3 output. [read-only]"
+            "Returns raw PM3 output. "
+            "[read-only] [Duration: fast (~1-2 s -- single pm3 command round-trip).]"
         ),
         inputSchema={
             "type": "object",
@@ -111,7 +120,8 @@ TOOL_DEFINITIONS = [
         name="hf_info",
         description=(
             "Run 'hf search' and, if a tag is found, 'hf 14a info'. "
-            "Returns combined parsed result. [read-only]"
+            "Returns combined parsed result. "
+            "[read-only] [Duration: fast (~2-4 s -- two pm3 command round-trips).]"
         ),
         inputSchema={
             "type": "object",
@@ -127,7 +137,8 @@ TOOL_DEFINITIONS = [
     Tool(
         name="lf_info",
         description=(
-            "Run 'lf search' and return parsed low-frequency tag information. [read-only]"
+            "Run 'lf search' and return parsed low-frequency tag information. "
+            "[read-only] [Duration: fast (~2-5 s -- lf search samples for a short window).]"
         ),
         inputSchema={
             "type": "object",
@@ -144,7 +155,8 @@ TOOL_DEFINITIONS = [
         name="read_block",
         description=(
             "Read a single MIFARE Classic block by number. "
-            "Returns hex and ASCII representations. [read-only]"
+            "Returns hex and ASCII representations. "
+            "[read-only] [Duration: fast (~1-2 s -- single block read).]"
         ),
         inputSchema={
             "type": "object",
@@ -175,7 +187,9 @@ TOOL_DEFINITIONS = [
         name="dump_tag",
         description=(
             "Dump a tag to the engagement artifacts directory. "
-            "Supports MIFARE Classic 1K/4K and MIFARE Ultralight. [read-only]"
+            "Supports MIFARE Classic 1K/4K and MIFARE Ultralight. "
+            "[read-only] [Duration: slow (~30-60 s for MIFARE Classic 1K/4K -- "
+            "reads all sectors sequentially). Background-dispatch recommended.]"
         ),
         inputSchema={
             "type": "object",
@@ -203,7 +217,9 @@ TOOL_DEFINITIONS = [
         description=(
             "Run 'hf mf autopwn' to automatically recover all MIFARE Classic keys. "
             "Chains dictionary, darkside, nested, and hardnested attacks as needed. "
-            "Returns recovered keys and dump path. [read-only]"
+            "Returns recovered keys and dump path. "
+            "[read-only] [Duration: very-slow (5-30+ min depending on card PRNG and "
+            "key diversity). Background-dispatch required.]"
         ),
         inputSchema={
             "type": "object",
@@ -220,7 +236,9 @@ TOOL_DEFINITIONS = [
         name="darkside",
         description=(
             "Run 'hf mf darkside' to recover a MIFARE Classic key using the "
-            "darkside attack. Only works on cards with a weak PRNG. [read-only]"
+            "darkside attack. Only works on cards with a weak PRNG. "
+            "[read-only] [Duration: slow (~30-120 s -- PRNG-dependent). "
+            "Background-dispatch recommended.]"
         ),
         inputSchema={
             "type": "object",
@@ -237,7 +255,9 @@ TOOL_DEFINITIONS = [
         name="nested",
         description=(
             "Run 'hf mf nested' to recover unknown MIFARE Classic keys using a "
-            "known key. Requires a working key for at least one sector. [read-only]"
+            "known key. Requires a working key for at least one sector. "
+            "[read-only] [Duration: slow (~30-120 s per sector depending on nonce "
+            "collection). Background-dispatch recommended.]"
         ),
         inputSchema={
             "type": "object",
@@ -272,7 +292,9 @@ TOOL_DEFINITIONS = [
         name="hardnested",
         description=(
             "Run 'hf mf hardnested' to recover unknown MIFARE Classic keys using a "
-            "known key. Works on cards with a hard PRNG where nested fails. [read-only]"
+            "known key. Works on cards with a hard PRNG where nested fails. "
+            "[read-only] [Duration: very-slow (5-30+ min -- hard PRNG nonce collection "
+            "is CPU-intensive). Background-dispatch required.]"
         ),
         inputSchema={
             "type": "object",
@@ -307,7 +329,9 @@ TOOL_DEFINITIONS = [
         name="chk_keys",
         description=(
             "Run 'hf mf chk' to test a list of keys against all sectors. "
-            "Returns which keys authenticate to which sectors. [read-only]"
+            "Returns which keys authenticate to which sectors. "
+            "[read-only] [Duration: slow (~10-90 s depending on key list size -- "
+            "tests each key against each sector). Background-dispatch recommended.]"
         ),
         inputSchema={
             "type": "object",
@@ -330,7 +354,8 @@ TOOL_DEFINITIONS = [
         name="desfire_info",
         description=(
             "Run 'hf mfdes info' on a DESFire tag. Returns UID, version, "
-            "storage, applications, auth methods, signature verification. [read-only]"
+            "storage, applications, auth methods, signature verification. "
+            "[read-only] [Duration: fast (~2-5 s -- info command plus signature check).]"
         ),
         inputSchema={
             "type": "object",
@@ -347,7 +372,8 @@ TOOL_DEFINITIONS = [
         name="desfire_apps",
         description=(
             "Enumerate DESFire applications without authentication. "
-            "Returns AIDs, descriptions, and auth requirements per app. [read-only]"
+            "Returns AIDs, descriptions, and auth requirements per app. "
+            "[read-only] [Duration: fast (~2-5 s -- AID enumeration over NFC).]"
         ),
         inputSchema={
             "type": "object",
@@ -364,7 +390,8 @@ TOOL_DEFINITIONS = [
         name="desfire_files",
         description=(
             "List files in a DESFire application (typically requires auth). "
-            "An auth-required error is itself a finding: properly secured. [read-only]"
+            "An auth-required error is itself a finding: properly secured. "
+            "[read-only] [Duration: fast (~2-5 s -- file listing over NFC).]"
         ),
         inputSchema={
             "type": "object",
@@ -383,7 +410,10 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iclass_info",
-        description="Get iCLASS / PicoPass tag information (CSN, card type). [read-only]",
+        description=(
+            "Get iCLASS / PicoPass tag information (CSN, card type). "
+            "[read-only] [Duration: fast (~1-2 s -- single pm3 command round-trip).]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -394,7 +424,10 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iclass_rdbl",
-        description="Read an iCLASS / PicoPass block. Blocks 0-4 are usually readable without a key. [read-only]",
+        description=(
+            "Read an iCLASS / PicoPass block. Blocks 0-4 are usually readable without a key. "
+            "[read-only] [Duration: fast (~1-2 s -- single block read).]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -408,7 +441,10 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iso15693_info",
-        description="Get ISO 15693 tag information (UID, type, manufacturer). [read-only]",
+        description=(
+            "Get ISO 15693 tag information (UID, type, manufacturer). "
+            "[read-only] [Duration: fast (~1-2 s -- single pm3 command round-trip).]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -419,7 +455,10 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iso15693_rdbl",
-        description="Read an ISO 15693 block. [read-only]",
+        description=(
+            "Read an ISO 15693 block. "
+            "[read-only] [Duration: fast (~1-2 s -- single block read).]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -431,7 +470,11 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iclass_dump",
-        description="Dump iCLASS / PicoPass tag memory to file. [read-only]",
+        description=(
+            "Dump iCLASS / PicoPass tag memory to file. "
+            "[read-only] [Duration: slow (~15-60 s -- reads all blocks). "
+            "Background-dispatch recommended.]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -444,7 +487,11 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iso15693_dump",
-        description="Dump ISO 15693 tag memory to file. [read-only]",
+        description=(
+            "Dump ISO 15693 tag memory to file. "
+            "[read-only] [Duration: slow (~15-60 s -- reads all blocks). "
+            "Background-dispatch recommended.]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -455,7 +502,11 @@ TOOL_DEFINITIONS = [
     ),
     Tool(
         name="iclass_chk",
-        description="Check iCLASS keys from built-in dictionary. [read-only]",
+        description=(
+            "Check iCLASS keys from built-in dictionary. "
+            "[read-only] [Duration: slow (~20-90 s -- tests each dictionary key). "
+            "Background-dispatch recommended.]"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -470,7 +521,9 @@ TOOL_DEFINITIONS = [
         name="iclass_loclass",
         description=(
             "Recover iCLASS key via loclass attack. Requires a trace file "
-            "from 'hf iclass sim -t 2'. [read-only]"
+            "from 'hf iclass sim -t 2'. "
+            "[read-only] [Duration: slow (~30-120 s -- LOCLASS offline recovery). "
+            "Background-dispatch recommended.]"
         ),
         inputSchema={
             "type": "object",
@@ -484,7 +537,8 @@ TOOL_DEFINITIONS = [
     Tool(
         name="mf_wrbl",
         description=(
-            "Write a MIFARE Classic block. DESTRUCTIVE: overwrites tag data permanently. [approval-write]"
+            "Write a MIFARE Classic block. DESTRUCTIVE: overwrites tag data permanently. "
+            "[approval-write] [Duration: fast (~1-2 s -- single block write).]"
         ),
         inputSchema={
             "type": "object",
@@ -503,7 +557,9 @@ TOOL_DEFINITIONS = [
     Tool(
         name="mf_restore",
         description=(
-            "Restore a full dump to a MIFARE Classic tag. DESTRUCTIVE: overwrites entire tag. [approval-write]"
+            "Restore a full dump to a MIFARE Classic tag. DESTRUCTIVE: overwrites entire tag. "
+            "[approval-write] [Duration: slow (~30-60 s -- writes all sectors). "
+            "Background-dispatch recommended.]"
         ),
         inputSchema={
             "type": "object",
@@ -521,7 +577,8 @@ TOOL_DEFINITIONS = [
     Tool(
         name="iclass_wrbl",
         description=(
-            "Write an iCLASS block. DESTRUCTIVE: overwrites tag data permanently. [approval-write]"
+            "Write an iCLASS block. DESTRUCTIVE: overwrites tag data permanently. "
+            "[approval-write] [Duration: fast (~1-2 s -- single block write).]"
         ),
         inputSchema={
             "type": "object",
@@ -540,7 +597,8 @@ TOOL_DEFINITIONS = [
     Tool(
         name="iso15693_wrbl",
         description=(
-            "Write an ISO 15693 block. DESTRUCTIVE: overwrites tag data permanently. [approval-write]"
+            "Write an ISO 15693 block. DESTRUCTIVE: overwrites tag data permanently. "
+            "[approval-write] [Duration: fast (~1-2 s -- single block write).]"
         ),
         inputSchema={
             "type": "object",
@@ -558,7 +616,10 @@ TOOL_DEFINITIONS = [
         name="sniff_start",
         description=(
             "Start sniffing reader-tag communication. BLOCKS until user presses the PM3 button. "
-            "Position the PM3 between reader and tag before calling. [allowed-write]"
+            "Position the PM3 between reader and tag before calling. "
+            "[allowed-write] [Duration: instant (returns immediately after starting sniffer). "
+            "Lifecycle: persistent -- sniffer runs until user presses PM3 button. "
+            "Call sniff_stop to retrieve trace data.]"
         ),
         inputSchema={
             "type": "object",
@@ -577,7 +638,8 @@ TOOL_DEFINITIONS = [
         name="sniff_stop",
         description=(
             "Retrieve and decode sniffed trace data. Call after sniff_start completes "
-            "(user pressed PM3 button). Saves trace file and returns decoded exchanges. [allowed-write]"
+            "(user pressed PM3 button). Saves trace file and returns decoded exchanges. "
+            "[allowed-write] [Duration: fast (~2-5 s -- trace decode and file save).]"
         ),
         inputSchema={
             "type": "object",
