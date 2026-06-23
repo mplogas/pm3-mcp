@@ -59,9 +59,9 @@ TOOL_DEFINITIONS = [
                     "type": "string",
                     "description": "Target device or engagement name used for the folder",
                 },
-                "project_path": {
+                "engagement_path": {
                     "type": "string",
-                    "description": "Path to a project folder (from project-mcp). If provided, writes to <project_path>/pm3/ instead of creating a standalone engagement.",
+                    "description": "Path to an engagement folder (from project-mcp). If provided, writes to <engagement_path>/pm3/ instead of creating a standalone engagement.",
                 },
             },
             "required": ["engagement_name"],
@@ -690,7 +690,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 manager=connection_manager,
                 port=arguments.get("port"),
                 engagement_name=arguments["engagement_name"],
-                project_path=arguments.get("project_path"),
+                engagement_path=arguments.get("engagement_path"),
             )
 
         elif name == "disconnect":
