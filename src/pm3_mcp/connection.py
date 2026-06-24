@@ -105,7 +105,7 @@ class ConnectionManager:
         self,
         engagement_name: str,
         port: str | None = None,
-        project_path: str | None = None,
+        engagement_path: str | None = None,
     ) -> str | None:
         """Connect to a PM3 device, create engagement folder.
 
@@ -131,10 +131,10 @@ class ConnectionManager:
         sanitized = _sanitize_name(engagement_name)
         timestamp = datetime.now().strftime("%d-%m-%Y-%H-%M")
 
-        if project_path is not None:
-            resolved = Path(project_path).resolve()
+        if engagement_path is not None:
+            resolved = Path(engagement_path).resolve()
             if not resolved.is_relative_to(self._engagements_dir.resolve()):
-                raise ValueError("project_path must be under engagements directory")
+                raise ValueError("engagement_path must be under engagements directory")
             engagement_path = resolved / "pm3"
             engagement_path.mkdir(parents=True, exist_ok=True)
             (engagement_path / "logs").mkdir(exist_ok=True)

@@ -90,7 +90,7 @@ async def tool_connect(
     manager: ConnectionManager,
     port: str | None,
     engagement_name: str,
-    project_path: str | None = None,
+    engagement_path: str | None = None,
 ) -> dict[str, Any]:
     """Connect to a PM3 device and create an engagement folder.
 
@@ -98,7 +98,7 @@ async def tool_connect(
     Returns {"error": ...} on failure.
     """
     try:
-        session_id = manager.connect(engagement_name, port=port, project_path=project_path)
+        session_id = manager.connect(engagement_name, port=port, engagement_path=engagement_path)
     except Exception as exc:
         log.error("connect failed: %s", exc)
         return {"error": str(exc)}

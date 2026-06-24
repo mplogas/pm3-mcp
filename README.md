@@ -108,7 +108,7 @@ Proxmark3 (iceman fw) via USB serial
 
 ## Project Integration
 
-The `connect` tool accepts an optional `project_path` parameter. When provided (from project-mcp's `create_project`), engagement data is written to `<project_path>/pm3/` instead of creating a standalone folder. Omit it for standalone use.
+The `connect` tool accepts an optional `engagement_path` parameter. When provided (from project-mcp's `open_engagement`), engagement data is written to `<engagement_path>/pm3/` instead of creating a standalone folder. Omit it for standalone use.
 
 ## Known Constraints
 
