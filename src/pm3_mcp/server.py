@@ -664,6 +664,11 @@ async def list_tools():
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    if "project_path" in arguments:
+        return [TextContent(type="text", text=json.dumps({
+            "error": "project_path was renamed to engagement_path in v0.3. "
+                     "Pass engagement_path instead.",
+        }))]
     tier = classify_tool(name)
     logger.info("tool=%s tier=%s args=%s", name, tier.value, arguments)
 
